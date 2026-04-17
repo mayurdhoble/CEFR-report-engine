@@ -178,44 +178,9 @@ export default function App() {
 
         <nav style={{ display: "flex", flexDirection: "column", gap: 2 }}>
           <NavItem icon="▤" label="Overview" active={true} />
-          <NavItem icon="↗" label="Monthly Trends" />
-          <NavItem icon="≡" label="Usage Insights" />
-          <NavItem icon="◫" label="Companies" />
-          <NavItem icon="◈" label="Categories" />
         </nav>
 
         <div style={{ flex: 1 }} />
-
-        {/* Add More Data */}
-        <button
-          onClick={() => inputRef.current.click()}
-          style={{
-            background: C.orange, color: "#fff", border: "none",
-            borderRadius: 10, padding: "11px 0", width: "100%",
-            fontWeight: 700, fontSize: 13, cursor: "pointer",
-            display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
-          }}>
-          ↑ Add More Data
-        </button>
-
-        {isDone && (
-          <button
-            onClick={reset}
-            style={{
-              background: "transparent", color: C.red, border: "none",
-              padding: "10px 0", width: "100%", fontWeight: 600,
-              fontSize: 13, cursor: "pointer", marginTop: 6,
-            }}>
-            ⊗ Clear All Data
-          </button>
-        )}
-
-        {file && (
-          <div style={{ fontSize: 11, color: C.sub, marginTop: 8,
-            textAlign: "center", wordBreak: "break-all" }}>
-            {file.name} · {rows.length > 0 ? `${rows.length} rows` : "ready"}
-          </div>
-        )}
       </aside>
 
       {/* ── Main content ────────────────────────────────────────────────────── */}
