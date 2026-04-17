@@ -1,0 +1,28 @@
+version: "3.9"
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: cefr_user
+      POSTGRES_PASSWORD: cefr_pass
+      POSTGRES_DB: cefr_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  backend:
+    build: ./backend
+    restart: unless-stopped
+    depends_on:
+      - db
+    environment:
+      DATABASE_URL: postgresql://cefr_user:cefr_pass@db:5432/cefr_db
+      BASE_URL: http://localhost:8000
+    ports:
+      - "8000:8000"
+
+volumes:
+  pgdata:

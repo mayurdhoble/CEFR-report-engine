@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+
+# Environment
+.env
+
+# Node
+node_modules/
+dist/
+.npm/
+
+# Test output
+cefr-report/backend/test_output.pdf
+
+# OS
+.DS_Store
+Thumbs.db
