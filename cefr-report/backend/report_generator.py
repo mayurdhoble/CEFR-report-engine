@@ -58,8 +58,8 @@ INFO_GREY   = colors.HexColor("#9CA3AF")   # cover info values
 STYLES = {
     "logo":       S("logo",   fontName="Helvetica-Bold", fontSize=16, textColor=ORANGE),
     "title":      S("title",  fontName="Helvetica-Bold", fontSize=26, textColor=PURPLE, spaceAfter=6),
-    "lbl":        S("lbl",    fontName="Helvetica-Bold", fontSize=13, textColor=SOFT_PURPLE, spaceBefore=12),
-    "val":        S("val",    fontName="Helvetica",      fontSize=12, textColor=INFO_GREY),
+    "lbl":        S("lbl",    fontName="Helvetica-Bold", fontSize=17, textColor=SOFT_PURPLE, spaceBefore=18),
+    "val":        S("val",    fontName="Helvetica",      fontSize=15, textColor=INFO_GREY),
     "sec_head":   S("sh",     fontName="Helvetica-Bold", fontSize=14, textColor=HEADING, spaceBefore=2, spaceAfter=2),
     "col_head":   S("ch",     fontName="Helvetica-Bold", fontSize=13, textColor=HEADING),
     "col_head_r": S("chr",    fontName="Helvetica-Bold", fontSize=13, textColor=HEADING, alignment=TA_RIGHT),
@@ -421,9 +421,9 @@ class CoverPanel(Flowable):
         H_ = self.PANEL_H
         EXT = self.TOP_EXT
 
-        # Full-bleed lavender — extends beyond flowable top to reach page edge
+        # Full-bleed lavender — over-extend by 10pt to guarantee no white slivers
         c.setFillColor(LAVENDER)
-        c.rect(-L_MARGIN, 0, W, H_ + EXT, fill=1, stroke=0)
+        c.rect(-L_MARGIN - 10, -10, W + 20, H_ + EXT + 20, fill=1, stroke=0)
 
         # iMocha logo — top-left of lavender, larger and closer to page top
         logo_h = 40
@@ -472,7 +472,9 @@ def _cover_page(candidate: dict) -> list:
         ("VALIGN",        (0, 0), (-1, -1), "TOP"),
         ("LEFTPADDING",   (0, 0), (-1, -1), 0),
         ("RIGHTPADDING",  (0, 0), (-1, -1), 0),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+        # Extra gap after first value row (separates the two label groups)
+        ("BOTTOMPADDING", (0, 1), (-1, 1), 28),
     ]))
     e.append(t)
     e.append(Spacer(1, 60))
