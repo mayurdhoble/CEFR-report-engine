@@ -45,6 +45,11 @@ class CandidateReport(Base):
     listening_scale_score = Column(Integer)
     listening_performance_pct = Column(Float)
 
+    # Computed by scoring engine — Writing
+    writing_weighted_score = Column(Float)
+    writing_cefr_display   = Column(String)
+    writing_scale_score    = Column(Integer)
+
     # PDF blob
     pdf_data = Column(LargeBinary, nullable=False)
 

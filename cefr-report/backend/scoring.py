@@ -22,6 +22,7 @@ READING_BANDS = {
 
 # Human-readable labels
 PROFICIENCY_LABELS = {
+    "Pre A1":  "Pre-Beginner User",
     "BelowA2": "Beginner User",
     "A1":      "Beginner User",
     "A2":      "Elementary User",
@@ -102,6 +103,109 @@ LISTENING_SKILL_DEFINITION = (
     "The score is based on the ability to extract key information, follow discourse structure, "
     "and comprehend meaning from audio at natural speaking speeds."
 )
+
+
+# ── Writing ────────────────────────────────────────────────────────────────────
+
+WRITING_BANDS = {
+    "Pre A1": {"band_start": 80,  "band_range": 19},
+    "A1":     {"band_start": 100, "band_range": 19},
+    "A2":     {"band_start": 120, "band_range": 19},
+    "B1":     {"band_start": 140, "band_range": 19},
+    "B2":     {"band_start": 160, "band_range": 19},
+    "C1":     {"band_start": 180, "band_range": 19},
+    "C2":     {"band_start": 200, "band_range": 30},
+}
+
+WRITING_CAPABILITY = {
+    "Pre A1": (
+        "Candidate cannot yet produce recognisable written English. "
+        "Writing is limited to isolated words or copied text with no coherent structure."
+    ),
+    "A1": (
+        "Candidate can write simple isolated phrases and sentences about personal details "
+        "using basic vocabulary and very simple sentence structures."
+    ),
+    "A2": (
+        "Candidate can write short, simple messages and fill in basic forms. "
+        "Can produce simple connected sentences on familiar topics using common connectors."
+    ),
+    "B1": (
+        "Candidate can write straightforward connected text on familiar subjects. "
+        "Can produce personal letters and structured emails describing experiences and opinions."
+    ),
+    "B2": (
+        "Candidate can write clear, detailed text on a variety of subjects. "
+        "Can write essays or reports that develop an argument and highlight key points."
+    ),
+    "C1": (
+        "Candidate can express themselves in clear, well-structured text with controlled use of "
+        "organisational patterns and connectors. Writing shows flexibility and precision."
+    ),
+    "C2": (
+        "Candidate can write clear, smooth-flowing, complex texts with an appropriate and effective "
+        "style. Can produce sophisticated reports and articles with a high degree of accuracy."
+    ),
+}
+
+WRITING_SKILL_DEFINITION = (
+    "Writing reflects the ability to produce clear, structured, and accurate written English "
+    "in workplace and everyday contexts. The score is based on grammar, vocabulary, coherence, "
+    "comprehension, orthographic control, and thematic development."
+)
+
+
+def run_writing_score(
+    grammar: float,
+    vocabulary: float,
+    comprehension: float,
+    orthographic: float,
+    coherence: float,
+    thematic: float,
+) -> dict:
+    """
+    Computes Writing CEFR level and Cambridge scale score from sub-skill percentages (0-100 each).
+
+    Weightages: Grammar 20%, Vocabulary 10%, Comprehension 30%,
+                Orthographic 10%, Coherence 20%, Thematic 10%.
+    Band lookup: direct threshold (no pass chain).
+    """
+    weighted = round(
+        grammar      * 0.20 +
+        vocabulary   * 0.10 +
+        comprehension * 0.30 +
+        orthographic * 0.10 +
+        coherence    * 0.20 +
+        thematic     * 0.10,
+        1,
+    )
+
+    if weighted > 90:
+        display = "C2"
+    elif weighted >= 76:
+        display = "C1"
+    elif weighted >= 56:
+        display = "B2"
+    elif weighted >= 47:
+        display = "B1"
+    elif weighted >= 35:
+        display = "A2"
+    elif weighted >= 20:
+        display = "A1"
+    else:
+        display = "Pre A1"
+
+    band        = WRITING_BANDS[display]
+    scale_score = band["band_start"] + round(weighted * band["band_range"] / 100)
+
+    return {
+        "cefr_display":         display,
+        "scale_score":          scale_score,
+        "performance_pct":      weighted,
+        "proficiency_label":    PROFICIENCY_LABELS.get(display, ""),
+        "capability_statement": WRITING_CAPABILITY.get(display, ""),
+        "skill_definition":     WRITING_SKILL_DEFINITION,
+    }
 
 
 def run_listening_pass_chain(

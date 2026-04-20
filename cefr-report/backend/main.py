@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 from database import SessionLocal, engine
 from models import Base, CandidateReport
 from report_generator import generate_reading_report
-from scoring import run_reading_pass_chain, run_listening_pass_chain
+from scoring import run_reading_pass_chain, run_listening_pass_chain, run_writing_score
 
 load_dotenv()
 Base.metadata.create_all(bind=engine)
@@ -80,20 +80,28 @@ async def upload_csv(file: UploadFile = File(...)):
         row = row.where(pd.notna(row), None)  # normalise NaN → None
 
         # ── Extract Reading scores ─────────────────────────────────────────
-        a2_candidate = _get(row, "Reading (A2)_Candidate_Score")
-        a2_total     = _get(row, "Reading (A2)_Total_Score", default=6)
-        b1_candidate = _get(row, "Reading (B1)_Candidate_Score")
-        b1_total     = _get(row, "Reading (B1)_Total_Score", default=9)
-        b2_candidate = _get(row, "Reading (B2-C1)_Candidate_Score")
-        b2_total     = _get(row, "Reading (B2-C1)_Total_Score", default=11)
+        a2_candidate = _get(row, "Reading (A2)_Candidate_Score", "Reading A2_Candidate_Score")
+        a2_total     = _get(row, "Reading (A2)_Total_Score",     "Reading A2_Total_Score",     default=6)
+        b1_candidate = _get(row, "Reading (B1)_Candidate_Score", "Reading B1_Candidate_Score")
+        b1_total     = _get(row, "Reading (B1)_Total_Score",     "Reading B1_Total_Score",     default=9)
+        b2_candidate = _get(row, "Reading (B2-C1)_Candidate_Score", "Reading B2_Candidate_Score")
+        b2_total     = _get(row, "Reading (B2-C1)_Total_Score",     "Reading B2_Total_Score",  default=11)
 
         # ── Extract Listening scores ───────────────────────────────────────
-        la2_candidate = _get(row, "Listening (A2)_Candidate_Score")
-        la2_total     = _get(row, "Listening (A2)_Total_Score", default=6)
-        lb1_candidate = _get(row, "Listening (B1)_Candidate_Score")
-        lb1_total     = _get(row, "Listening (B1)_Total_Score", default=9)
-        lb2_candidate = _get(row, "Listening (B2-C1)_Candidate_Score")
-        lb2_total     = _get(row, "Listening (B2-C1)_Total_Score", default=11)
+        la2_candidate = _get(row, "Listening (A2)_Candidate_Score", "Listening A2_Candidate_Score")
+        la2_total     = _get(row, "Listening (A2)_Total_Score",     "Listening A2_Total_Score",     default=6)
+        lb1_candidate = _get(row, "Listening (B1)_Candidate_Score", "Listening B1_Candidate_Score")
+        lb1_total     = _get(row, "Listening (B1)_Total_Score",     "Listening B1_Total_Score",     default=9)
+        lb2_candidate = _get(row, "Listening (B2-C1)_Candidate_Score", "Listening B2_Candidate_Score")
+        lb2_total     = _get(row, "Listening (B2-C1)_Total_Score",     "Listening B2_Total_Score",  default=11)
+
+        # ── Extract Writing sub-skill percentages ─────────────────────────
+        w_grammar  = _get(row, "Email Writing_Grammar_Percentage",              "Writing_Grammar_Percentage")
+        w_vocab    = _get(row, "Email Writing_Vocabulary_Percentage",           "Writing_Vocabulary_Percentage")
+        w_comp     = _get(row, "Email Writing_Comprehension_Percentage",        "Writing_Comprehension_Percentage")
+        w_ortho    = _get(row, "Email Writing_Orthographic_Control_Percentage", "Writing_Orthographic_Control_Percentage")
+        w_coher    = _get(row, "Email Writing_CoherenceAndCohesion_Percentage", "Writing_CoherenceAndCohesion_Percentage")
+        w_thematic = _get(row, "Email Writing_Thematic_Development_Percentage", "Writing_Thematic_Development_Percentage")
 
         # ── Run scoring engines ────────────────────────────────────────────
         reading_scoring = run_reading_pass_chain(
@@ -103,6 +111,9 @@ async def upload_csv(file: UploadFile = File(...)):
         listening_scoring = run_listening_pass_chain(
             la2_candidate, lb1_candidate, lb2_candidate,
             a2_total=la2_total, b1_total=lb1_total, b2_total=lb2_total,
+        )
+        writing_scoring = run_writing_score(
+            w_grammar, w_vocab, w_comp, w_ortho, w_coher, w_thematic,
         )
 
         # ── Candidate metadata ─────────────────────────────────────────────
@@ -116,7 +127,7 @@ async def upload_csv(file: UploadFile = File(...)):
         }
 
         # ── Generate PDF ───────────────────────────────────────────────────
-        pdf_bytes = generate_reading_report(candidate, reading_scoring, listening_scoring)
+        pdf_bytes = generate_reading_report(candidate, reading_scoring, listening_scoring, writing_scoring)
 
         # ── Persist to DB ──────────────────────────────────────────────────
         report_uuid = str(uuid.uuid4())
@@ -145,6 +156,9 @@ async def upload_csv(file: UploadFile = File(...)):
             listening_cefr_display=listening_scoring["cefr_display"],
             listening_scale_score=listening_scoring["scale_score"],
             listening_performance_pct=listening_scoring["performance_pct"],
+            writing_weighted_score=writing_scoring["performance_pct"],
+            writing_cefr_display=writing_scoring["cefr_display"],
+            writing_scale_score=writing_scoring["scale_score"],
             pdf_data=pdf_bytes,
         )
         db.add(record)
@@ -153,17 +167,39 @@ async def upload_csv(file: UploadFile = File(...)):
         link = f"{BASE_URL}/report/{report_uuid}"
         report_links.append(link)
         results.append({
-            "candidate_name": candidate["name"],
-            "candidate_id": candidate["id"],
-            "reading_cefr": reading_scoring["cefr_display"],
-            "listening_cefr": listening_scoring["cefr_display"],
-            "report_link": link,
+            "candidate_name":          candidate["name"],
+            "candidate_id":            candidate["id"],
+            "reading_cefr_level":      reading_scoring["cefr_display"],
+            "reading_cefr_total_score": reading_scoring["performance_pct"],
+            "reading_scale_score":     reading_scoring["scale_score"],
+            "reading_scale_cefr":      reading_scoring["cefr_display"],
+            "listening_cefr_level":    listening_scoring["cefr_display"],
+            "listening_cefr_total_score": listening_scoring["performance_pct"],
+            "listening_scale_score":   listening_scoring["scale_score"],
+            "listening_scale_cefr":    listening_scoring["cefr_display"],
+            "writing_score":           writing_scoring["performance_pct"],
+            "writing_cefr":            writing_scoring["cefr_display"],
+            "writing_scale":           writing_scoring["scale_score"],
+            "writing_scale_cefr":      writing_scoring["cefr_display"],
+            "report_link":             link,
         })
 
     db.close()
 
-    # ── Append Report_Link column and return modified Excel ────────────────
-    df["Report_Link"] = report_links
+    # ── Append scoring columns and Report_Link, then return modified Excel ─
+    df["Reading - CEFR Level"]       = [r["reading_cefr_level"]       for r in results]
+    df["Reading - CEFR Total Score"] = [r["reading_cefr_total_score"] for r in results]
+    df["Reading Scale Score"]        = [r["reading_scale_score"]      for r in results]
+    df["Reading Scale CEFR"]         = [r["reading_scale_cefr"]       for r in results]
+    df["Listening - CEFR Level"]       = [r["listening_cefr_level"]       for r in results]
+    df["Listening - CEFR Total Score"] = [r["listening_cefr_total_score"] for r in results]
+    df["Listening Scale Score"]        = [r["listening_scale_score"]      for r in results]
+    df["Listening Scale CEFR"]         = [r["listening_scale_cefr"]       for r in results]
+    df["Writing Score"]                = [r["writing_score"]              for r in results]
+    df["Writing CEFR"]                 = [r["writing_cefr"]               for r in results]
+    df["Writing Scale"]                = [r["writing_scale"]              for r in results]
+    df["Writing Scale CEFR"]           = [r["writing_scale_cefr"]         for r in results]
+    df["Report_Link"]                  = report_links
     out = io.BytesIO()
     df.to_excel(out, index=False)
     out.seek(0)

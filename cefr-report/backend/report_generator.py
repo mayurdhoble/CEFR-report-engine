@@ -7,16 +7,22 @@ Width budget (A4):
   Left/Right margins = 40 pt each  →  usable = 515 pt
 """
 import io
+import math
+import os
 from reportlab.lib.pagesizes import A4
 from reportlab.lib import colors
 from reportlab.platypus import (
     SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle,
-    HRFlowable, PageBreak,
+    HRFlowable, PageBreak, Image,
 )
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.enums import TA_LEFT, TA_RIGHT, TA_CENTER
 from reportlab.graphics.shapes import Drawing, Rect, String
 from reportlab.platypus.flowables import Flowable
+
+_HERE = os.path.dirname(os.path.abspath(__file__))
+LOGO_FULL = os.path.join(_HERE, "logoimocha.png")   # full logo (icon + text)
+LOGO_ICON = os.path.join(_HERE, "logo.png")          # icon only
 
 W, H = A4          # 595 × 842 pt
 USABLE = W - 80    # 515 pt  (margins 40 each side)
@@ -46,15 +52,20 @@ BADGE_COLORS = {
 def S(name, **kw):
     return ParagraphStyle(name, **kw)
 
+SOFT_PURPLE = colors.HexColor("#8B7EC8")   # cover info labels
+INFO_GREY   = colors.HexColor("#9CA3AF")   # cover info values
+
 STYLES = {
     "logo":       S("logo",   fontName="Helvetica-Bold", fontSize=16, textColor=ORANGE),
     "title":      S("title",  fontName="Helvetica-Bold", fontSize=26, textColor=PURPLE, spaceAfter=6),
-    "lbl":        S("lbl",    fontName="Helvetica-Bold", fontSize=10, textColor=PURPLE, spaceBefore=8),
-    "val":        S("val",    fontName="Helvetica",      fontSize=11, textColor=colors.HexColor("#374151")),
-    "sec_head":   S("sh",     fontName="Helvetica-Bold", fontSize=14, textColor=HEADING, spaceBefore=6, spaceAfter=4),
+    "lbl":        S("lbl",    fontName="Helvetica-Bold", fontSize=10, textColor=SOFT_PURPLE, spaceBefore=8),
+    "val":        S("val",    fontName="Helvetica",      fontSize=11, textColor=INFO_GREY),
+    "sec_head":   S("sh",     fontName="Helvetica-Bold", fontSize=14, textColor=HEADING, spaceBefore=2, spaceAfter=2),
     "col_head":   S("ch",     fontName="Helvetica-Bold", fontSize=10, textColor=HEADING),
+    "col_head_r": S("chr",    fontName="Helvetica-Bold", fontSize=10, textColor=HEADING, alignment=TA_RIGHT),
     "skill_lbl":  S("sl",     fontName="Helvetica",      fontSize=10, textColor=SUBTEXT),
     "skill_bold": S("sb",     fontName="Helvetica-Bold", fontSize=11, textColor=HEADING),
+    "score_r":    S("scr",    fontName="Helvetica-Bold", fontSize=10, textColor=HEADING, alignment=TA_RIGHT),
     "score":      S("sc",     fontName="Helvetica-Bold", fontSize=11, textColor=HEADING),
     "prof":       S("pr",     fontName="Helvetica",      fontSize=10, textColor=SUBTEXT),
     "cap":        S("ca",     fontName="Helvetica",      fontSize=9,  textColor=colors.HexColor("#374151"), leading=14),
@@ -64,6 +75,8 @@ STYLES = {
     "pg_num":     S("pn",     fontName="Helvetica",      fontSize=8,  textColor=SUBTEXT, alignment=TA_RIGHT),
     "log_hdr":    S("lh",     fontName="Helvetica-Bold", fontSize=9,  textColor=colors.white),
     "log_cell":   S("lc",     fontName="Helvetica",      fontSize=9,  textColor=colors.HexColor("#374151")),
+    "badge_lbl":  S("bgl",    fontName="Helvetica-Bold", fontSize=8,  textColor=colors.white, alignment=TA_CENTER),
+    "badge_sub":  S("bgs",    fontName="Helvetica",      fontSize=8,  textColor=SUBTEXT,       alignment=TA_CENTER),
 }
 
 
@@ -72,29 +85,100 @@ def _hr():
     return HRFlowable(width="100%", thickness=0.5, color=RULE, spaceAfter=4)
 
 
-def _footer(page_num: int):
-    """Footer row: logo left, page number right. Total = USABLE."""
-    data = [[
-        Paragraph("⬡ iMocha", STYLES["logo"]),
-        Paragraph(f"Page {page_num}", STYLES["pg_num"]),
-    ]]
-    t = Table(data, colWidths=[450, 65])   # 450+65 = 515 = USABLE
-    t.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "MIDDLE")]))
-    return t
+def _logo_img(height=22):
+    """Returns iMocha logo image at correct aspect ratio (759×354)."""
+    if os.path.exists(LOGO_FULL):
+        w = round(height * 759 / 354)
+        img = Image(LOGO_FULL, width=w, height=height)
+        img.hAlign = "LEFT"
+        return img
+    return Paragraph("iMocha", STYLES["logo"])
+
+
+TOTAL_PAGES = 4
+
+def _on_page(canvas, doc):
+    """Fixed footer drawn at bottom of every page via onPage callback."""
+    canvas.saveState()
+    page_num = doc.page
+    y = 28   # baseline from page bottom
+
+    # Separator line
+    canvas.setStrokeColor(RULE)
+    canvas.setLineWidth(0.5)
+    canvas.line(40, y + 16, W - 40, y + 16)
+
+    # Centred iMocha logo
+    logo_h = 18
+    logo_w = round(logo_h * 759 / 354)
+    if os.path.exists(LOGO_FULL):
+        canvas.drawImage(LOGO_FULL, (W - logo_w) / 2, y - 2,
+                         width=logo_w, height=logo_h, mask='auto')
+
+    # Page number right-aligned
+    canvas.setFont("Helvetica", 8)
+    canvas.setFillColor(SUBTEXT)
+    canvas.drawRightString(W - 40, y + 2, f"Page {page_num}/{TOTAL_PAGES}")
+    canvas.restoreState()
 
 
 def _section_heading(text: str):
-    """Orange left-bar heading — uses LINEBEFORE to avoid nested-table width issues."""
+    """Grey-background heading with orange left bar — matches iMocha HTML reference."""
     t = Table(
         [[Paragraph(text, STYLES["sec_head"])]],
         colWidths=[USABLE],
     )
     t.setStyle(TableStyle([
+        ("BACKGROUND",    (0, 0), (-1, -1), colors.HexColor("#F3F4F6")),
         ("LINEBEFORE",    (0, 0), (0, -1), 4, ORANGE),
         ("LEFTPADDING",   (0, 0), (-1, -1), 10),
-        ("RIGHTPADDING",  (0, 0), (-1, -1), 0),
-        ("TOPPADDING",    (0, 0), (-1, -1), 2),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
+        ("RIGHTPADDING",  (0, 0), (-1, -1), 8),
+        ("TOPPADDING",    (0, 0), (-1, -1), 10),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 10),
+    ]))
+    return t
+
+
+# CEFR legend row (Pre A1 → C2) shown below score chart
+_CEFR_LEGEND = [
+    ("Pre A1", "#BFDBFE", "#1E3A8A", "Beginner"),
+    ("A1",     "#60A5FA", "#FFFFFF", "Beginner"),
+    ("A2",     "#3B82F6", "#FFFFFF", "Elementary"),
+    ("B1",     "#2563EB", "#FFFFFF", "Intermediate"),
+    ("B2",     "#1D4ED8", "#FFFFFF", "Upper-Int"),
+    ("C1",     "#1E3A8A", "#FFFFFF", "Advanced"),
+    ("C2",     "#1E1B4B", "#FFFFFF", "Mastery"),
+]
+
+def _cefr_legend():
+    bw = USABLE / 7
+    badge_row, label_row, ts = [], [], []
+    for i, (lvl, bg, fg, sub) in enumerate(_CEFR_LEGEND):
+        fg_c = colors.HexColor(fg) if fg != "#1E3A8A" else colors.HexColor("#1E3A8A")
+        text_c = colors.HexColor(fg)
+        badge_row.append(Paragraph(
+            f'<b>{lvl}</b>',
+            ParagraphStyle(f"bl{i}", fontName="Helvetica-Bold", fontSize=9,
+                           textColor=text_c, alignment=TA_CENTER),
+        ))
+        label_row.append(Paragraph(
+            sub,
+            ParagraphStyle(f"bs{i}", fontName="Helvetica", fontSize=8,
+                           textColor=SUBTEXT, alignment=TA_CENTER),
+        ))
+        ts.append(("BACKGROUND",    (i, 0), (i, 0), colors.HexColor(bg)))
+        if i < 6:
+            ts.append(("LINEAFTER", (i, 0), (i, 0), 0.5, colors.white))
+
+    t = Table([badge_row, label_row], colWidths=[bw] * 7)
+    t.setStyle(TableStyle(ts + [
+        ("TOPPADDING",    (0, 0), (-1, 0),  8),
+        ("BOTTOMPADDING", (0, 0), (-1, 0),  8),
+        ("TOPPADDING",    (0, 1), (-1, 1),  4),
+        ("BOTTOMPADDING", (0, 1), (-1, 1),  4),
+        ("ALIGN",         (0, 0), (-1, -1), "CENTER"),
+        ("VALIGN",        (0, 0), (-1, -1), "MIDDLE"),
+        ("BOX",           (0, 0), (-1, 0),  0.5, RULE),
     ]))
     return t
 
@@ -272,49 +356,106 @@ class CEFRBadge(Flowable):
 # ══════════════════════════════════════════════════════════════════════════════
 # PAGE 1 — Cover
 # ══════════════════════════════════════════════════════════════════════════════
+LAVENDER     = colors.HexColor("#EEEFFE")
+L_MARGIN     = 40   # must match SimpleDocTemplate leftMargin
+
+
+class CoverPanel(Flowable):
+    """Full-bleed lavender panel: iMocha logo + orbit illustration + title — drawn with primitives."""
+    PANEL_H = 430
+
+    def __init__(self):
+        super().__init__()
+        self.width  = USABLE
+        self.height = self.PANEL_H
+
+    def draw(self):
+        c = self.canv
+
+        # Full-bleed lavender background
+        c.setFillColor(LAVENDER)
+        c.rect(-L_MARGIN, 0, W, self.PANEL_H, fill=1, stroke=0)
+
+        # iMocha logo — top-left
+        logo_h = 28
+        logo_w = round(logo_h * 759 / 354)
+        if os.path.exists(LOGO_FULL):
+            c.drawImage(LOGO_FULL, 0, self.PANEL_H - logo_h - 18,
+                        width=logo_w, height=logo_h, mask='auto')
+
+        # ── Orbit scene ────────────────────────────────────────────────────────
+        cx = USABLE / 2        # horizontal centre of scene
+        cy = 218               # vertical centre (from panel bottom)
+
+        # Concentric orbit rings
+        orbit_col = colors.HexColor("#D8C4DC")
+        for r in (55, 105, 158, 205):
+            c.setStrokeColor(orbit_col)
+            c.setLineWidth(0.6)
+            c.circle(cx, cy, r, fill=0, stroke=1)
+
+        # Avatars: (dx, dy, radius, fill_color) — positions mirror HTML reference
+        avatars = [
+            (   0,    0, 23, colors.HexColor("#EF4444")),   # centre
+            (  68,   84, 20, colors.HexColor("#4C1D95")),   # top-right
+            ( -95,   42, 20, colors.HexColor("#60A5FA")),   # left
+            (  22,   78, 17, colors.HexColor("#7DD3FC")),   # upper-mid
+            ( 148,   -8, 20, colors.HexColor("#93C5FD")),   # right
+            (-112,  -78, 20, colors.HexColor("#4C1D95")),   # lower-left
+            (  96, -122, 20, colors.HexColor("#60A5FA")),   # lower-right
+        ]
+        for dx, dy, r, fill in avatars:
+            ax, ay = cx + dx, cy + dy
+            c.setFillColor(fill)
+            c.circle(ax, ay, r, fill=1, stroke=0)
+            # White ring border
+            c.setStrokeColor(colors.white)
+            c.setLineWidth(2)
+            c.circle(ax, ay, r, fill=0, stroke=1)
+            # Small highlight dot
+            c.setFillColor(colors.HexColor("#FFFFFF"))
+            c.circle(ax + r * 0.28, ay + r * 0.28, r * 0.18, fill=1, stroke=0)
+
+        # "AI-English Pro" title — bottom of lavender panel
+        c.setFillColor(SOFT_PURPLE)
+        c.setFont("Helvetica-Bold", 32)
+        c.drawString(0, 26, "AI-English Pro")
+
+
 def _cover_page(candidate: dict) -> list:
     e = []
 
-    # Top accent bar
-    e.append(Table([[""]], colWidths=[USABLE], rowHeights=[4],
-                   style=TableStyle([("BACKGROUND", (0, 0), (-1, -1), ORANGE),
-                                     ("TOPPADDING", (0, 0), (-1, -1), 0),
-                                     ("BOTTOMPADDING", (0, 0), (-1, -1), 0)])))
-    e.append(Spacer(1, 18))
-    e.append(Paragraph("⬡ iMocha", STYLES["logo"]))
-    e.append(Spacer(1, 55))
-    e.append(Paragraph("AI-English Pro", STYLES["title"]))
-    e.append(_hr())
-    e.append(Spacer(1, 16))
+    # Full-bleed lavender panel drawn entirely with primitives
+    e.append(CoverPanel())
 
-    # 2-column info grid  (240 + 240 = 480 < 515)
+    # ── Candidate info on white ────────────────────────────────────────────────
+    e.append(Spacer(1, 20))
+
     COL = 240
     info = [
-        [Paragraph("Company",        STYLES["lbl"]),  Paragraph("Candidate Name", STYLES["lbl"])],
-        [Paragraph(candidate.get("company", "—"),  STYLES["val"]),
-         Paragraph(candidate.get("name",    "—"),  STYLES["val"])],
-        [Paragraph("Date of Attempt", STYLES["lbl"]), Paragraph("Candidate ID",   STYLES["lbl"])],
-        [Paragraph(candidate.get("appeared_on","—"), STYLES["val"]),
-         Paragraph(str(candidate.get("id","—")),   STYLES["val"])],
+        [Paragraph("Company",         STYLES["lbl"]), Paragraph("Candidate Name", STYLES["lbl"])],
+        [Paragraph(candidate.get("company", "—"),   STYLES["val"]),
+         Paragraph(candidate.get("name",    "—"),   STYLES["val"])],
+        [Paragraph("Date of Attempt",  STYLES["lbl"]), Paragraph("Candidate ID",  STYLES["lbl"])],
+        [Paragraph(candidate.get("appeared_on", "—"), STYLES["val"]),
+         Paragraph(str(candidate.get("id", "—")),   STYLES["val"])],
     ]
     t = Table(info, colWidths=[COL, COL])
     t.setStyle(TableStyle([
-        ("VALIGN",       (0, 0), (-1, -1), "TOP"),
-        ("LEFTPADDING",  (0, 0), (-1, -1), 0),
-        ("RIGHTPADDING", (0, 0), (-1, -1), 0),
-        ("BOTTOMPADDING",(0, 0), (-1, -1), 2),
+        ("VALIGN",        (0, 0), (-1, -1), "TOP"),
+        ("LEFTPADDING",   (0, 0), (-1, -1), 0),
+        ("RIGHTPADDING",  (0, 0), (-1, -1), 0),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
     ]))
     e.append(t)
-    e.append(Spacer(1, 200))
-    e.append(_hr())
-    e.append(_footer(1))
+    e.append(Spacer(1, 60))
     return e
 
 
 # ══════════════════════════════════════════════════════════════════════════════
 # PAGE 2 — Score Analysis
 # ══════════════════════════════════════════════════════════════════════════════
-def _score_analysis_page(reading_scoring: dict, listening_scoring: dict) -> list:
+def _score_analysis_page(reading_scoring: dict, listening_scoring: dict, writing_scoring: dict) -> list:
     e = []
     e.append(Spacer(1, 10))
     e.append(_section_heading("Score Analysis"))
@@ -333,11 +474,12 @@ def _score_analysis_page(reading_scoring: dict, listening_scoring: dict) -> list
     ]))
     e.append(title_row)
 
-    # Profile chart — DARK_HDR for Listening arrow, PURPLE for Reading
+    # Profile chart — DARK_HDR for Listening, PURPLE for Reading, ORANGE for Writing
     chart = CEFRProfileChart(
         skills=[
             ("Listening", int(listening_scoring.get("scale_score", 120)), DARK_HDR),
             ("Reading",   int(reading_scoring.get("scale_score",   120)), PURPLE),
+            ("Writing",   int(writing_scoring.get("scale_score",   120)), ORANGE),
         ],
         width=USABLE - 20,
         height=285,
@@ -360,8 +502,9 @@ def _score_analysis_page(reading_scoring: dict, listening_scoring: dict) -> list
         STYLES["blurb"],
     ))
 
-    e.append(_hr())
-    e.append(_footer(2))
+    # CEFR level legend badges
+    e.append(_cefr_legend())
+
     return e
 
 
@@ -369,21 +512,30 @@ def _score_analysis_page(reading_scoring: dict, listening_scoring: dict) -> list
 # PAGE 3 — Section Skill Analysis
 # ══════════════════════════════════════════════════════════════════════════════
 def _skill_section_row(section_num: int, label: str, scoring: dict) -> Table:
-    """One skill section row — reused for Reading and Listening."""
+    """One skill section row — reused for Reading, Listening, Writing."""
     LEFT_W  = 315
     RIGHT_W = 175
     INNER_L = 290
 
     pct = scoring["performance_pct"]
 
-    left_content = [
+    # Title line: section label left, total score right-aligned
+    title_tbl = Table([[
         Paragraph(
             f'<font color="#6B7280">Section {section_num}: </font>'
-            f'<b><font color="#2D2D6B">{label}</font></b>'
-            f'<font color="#2D2D6B">    &nbsp;&nbsp;&nbsp;&nbsp; '
-            f'Total Score: <b>{pct}/100</b></font>',
+            f'<b><font color="#2D2D6B">{label}</font></b>',
             STYLES["skill_lbl"],
         ),
+        Paragraph(f'Total Score: <b>{pct}/100</b>', STYLES["score_r"]),
+    ]], colWidths=[LEFT_W - 130, 120])
+    title_tbl.setStyle(TableStyle([
+        ("VALIGN",      (0, 0), (-1, -1), "MIDDLE"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 0),
+        ("RIGHTPADDING",(0, 0), (-1, -1), 0),
+    ]))
+
+    left_content = [
+        title_tbl,
         Spacer(1, 6),
         Table(
             [[CEFRBadge(scoring["cefr_display"], width=72, height=22),
@@ -414,7 +566,7 @@ def _skill_section_row(section_num: int, label: str, scoring: dict) -> Table:
     return body
 
 
-def _skill_analysis_page(reading_scoring: dict, listening_scoring: dict) -> list:
+def _skill_analysis_page(reading_scoring: dict, listening_scoring: dict, writing_scoring: dict) -> list:
     e = []
     e.append(Spacer(1, 10))
     e.append(_section_heading("Section Skill Analysis"))
@@ -424,7 +576,7 @@ def _skill_analysis_page(reading_scoring: dict, listening_scoring: dict) -> list
     LEFT_W, RIGHT_W = 315, 175
     hdr = Table(
         [[Paragraph("Capabilities and Skills", STYLES["col_head"]),
-          Paragraph("Understanding the skills", STYLES["col_head"])]],
+          Paragraph("Understanding the skills", STYLES["col_head_r"])]],
         colWidths=[LEFT_W, RIGHT_W],
     )
     hdr.setStyle(TableStyle([
@@ -443,10 +595,14 @@ def _skill_analysis_page(reading_scoring: dict, listening_scoring: dict) -> list
 
     # Section 2 — Listening
     e.append(_skill_section_row(2, "Listening", listening_scoring))
+    e.append(Spacer(1, 12))
+
+    e.append(HRFlowable(width="100%", thickness=0.3, color=RULE, spaceAfter=8))
+
+    # Section 3 — Writing
+    e.append(_skill_section_row(3, "Writing", writing_scoring))
 
     e.append(Spacer(1, 16))
-    e.append(_hr())
-    e.append(_footer(3))
     return e
 
 
@@ -478,15 +634,13 @@ def _test_log_page(candidate: dict) -> list:
     ]))
     e.append(log_t)
     e.append(Spacer(1, 40))
-    e.append(_hr())
-    e.append(_footer(4))
     return e
 
 
 # ══════════════════════════════════════════════════════════════════════════════
 # Public entry point
 # ══════════════════════════════════════════════════════════════════════════════
-def generate_reading_report(candidate: dict, reading_scoring: dict, listening_scoring: dict) -> bytes:
+def generate_reading_report(candidate: dict, reading_scoring: dict, listening_scoring: dict, writing_scoring: dict) -> bytes:
     buf = io.BytesIO()
     doc = SimpleDocTemplate(
         buf, pagesize=A4,
@@ -497,11 +651,11 @@ def generate_reading_report(candidate: dict, reading_scoring: dict, listening_sc
     story = []
     story.extend(_cover_page(candidate))
     story.append(PageBreak())
-    story.extend(_score_analysis_page(reading_scoring, listening_scoring))
+    story.extend(_score_analysis_page(reading_scoring, listening_scoring, writing_scoring))
     story.append(PageBreak())
-    story.extend(_skill_analysis_page(reading_scoring, listening_scoring))
+    story.extend(_skill_analysis_page(reading_scoring, listening_scoring, writing_scoring))
     story.append(PageBreak())
     story.extend(_test_log_page(candidate))
 
-    doc.build(story)
+    doc.build(story, onFirstPage=_on_page, onLaterPages=_on_page)
     return buf.getvalue()
