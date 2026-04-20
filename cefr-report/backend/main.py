@@ -10,6 +10,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response, StreamingResponse
 from sqlalchemy.orm import Session
 
+from sqlalchemy import text
+
 from database import SessionLocal, engine
 from models import Base, CandidateReport
 from report_generator import generate_reading_report
@@ -17,6 +19,13 @@ from scoring import run_reading_pass_chain, run_listening_pass_chain, run_writin
 
 load_dotenv()
 Base.metadata.create_all(bind=engine)
+
+# ── Idempotent migration: add Writing columns if they don't exist ────────────
+# `create_all` doesn't ALTER existing tables, so older Railway DBs need this.
+with engine.begin() as conn:
+    conn.execute(text("ALTER TABLE candidate_reports ADD COLUMN IF NOT EXISTS writing_weighted_score FLOAT"))
+    conn.execute(text("ALTER TABLE candidate_reports ADD COLUMN IF NOT EXISTS writing_cefr_display VARCHAR"))
+    conn.execute(text("ALTER TABLE candidate_reports ADD COLUMN IF NOT EXISTS writing_scale_score INTEGER"))
 
 BASE_URL = os.getenv("BASE_URL", "http://localhost:8000")
 
