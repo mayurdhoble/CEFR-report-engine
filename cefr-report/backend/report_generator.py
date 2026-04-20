@@ -58,8 +58,8 @@ INFO_GREY   = colors.HexColor("#9CA3AF")   # cover info values
 STYLES = {
     "logo":       S("logo",   fontName="Helvetica-Bold", fontSize=16, textColor=ORANGE),
     "title":      S("title",  fontName="Helvetica-Bold", fontSize=26, textColor=PURPLE, spaceAfter=6),
-    "lbl":        S("lbl",    fontName="Helvetica-Bold", fontSize=10, textColor=SOFT_PURPLE, spaceBefore=8),
-    "val":        S("val",    fontName="Helvetica",      fontSize=11, textColor=INFO_GREY),
+    "lbl":        S("lbl",    fontName="Helvetica-Bold", fontSize=13, textColor=SOFT_PURPLE, spaceBefore=12),
+    "val":        S("val",    fontName="Helvetica",      fontSize=12, textColor=INFO_GREY),
     "sec_head":   S("sh",     fontName="Helvetica-Bold", fontSize=14, textColor=HEADING, spaceBefore=2, spaceAfter=2),
     "col_head":   S("ch",     fontName="Helvetica-Bold", fontSize=10, textColor=HEADING),
     "col_head_r": S("chr",    fontName="Helvetica-Bold", fontSize=10, textColor=HEADING, alignment=TA_RIGHT),
@@ -101,24 +101,24 @@ def _on_page(canvas, doc):
     """Fixed footer drawn at bottom of every page via onPage callback."""
     canvas.saveState()
     page_num = doc.page
-    y = 28   # baseline from page bottom
+    logo_h = 28
+    logo_w = round(logo_h * 759 / 354)
+    y = 24   # bottom position for logo
 
-    # Separator line
+    # Separator line above footer
     canvas.setStrokeColor(RULE)
     canvas.setLineWidth(0.5)
-    canvas.line(40, y + 16, W - 40, y + 16)
+    canvas.line(40, y + logo_h + 8, W - 40, y + logo_h + 8)
 
-    # Centred iMocha logo
-    logo_h = 18
-    logo_w = round(logo_h * 759 / 354)
+    # Centred iMocha logo (larger)
     if os.path.exists(LOGO_FULL):
-        canvas.drawImage(LOGO_FULL, (W - logo_w) / 2, y - 2,
+        canvas.drawImage(LOGO_FULL, (W - logo_w) / 2, y,
                          width=logo_w, height=logo_h, mask='auto')
 
-    # Page number right-aligned
-    canvas.setFont("Helvetica", 8)
+    # Page number right-aligned, vertically centred with logo
+    canvas.setFont("Helvetica", 9)
     canvas.setFillColor(SUBTEXT)
-    canvas.drawRightString(W - 40, y + 2, f"Page {page_num}/{TOTAL_PAGES}")
+    canvas.drawRightString(W - 40, y + logo_h / 2 - 3, f"Page {page_num}/{TOTAL_PAGES}")
     canvas.restoreState()
 
 
@@ -150,35 +150,78 @@ _CEFR_LEGEND = [
     ("C2",     "#1E1B4B", "#FFFFFF", "Mastery"),
 ]
 
-def _cefr_legend():
-    bw = USABLE / 7
-    badge_row, label_row, ts = [], [], []
-    for i, (lvl, bg, fg, sub) in enumerate(_CEFR_LEGEND):
-        fg_c = colors.HexColor(fg) if fg != "#1E3A8A" else colors.HexColor("#1E3A8A")
-        text_c = colors.HexColor(fg)
-        badge_row.append(Paragraph(
-            f'<b>{lvl}</b>',
-            ParagraphStyle(f"bl{i}", fontName="Helvetica-Bold", fontSize=9,
-                           textColor=text_c, alignment=TA_CENTER),
-        ))
-        label_row.append(Paragraph(
-            sub,
-            ParagraphStyle(f"bs{i}", fontName="Helvetica", fontSize=8,
-                           textColor=SUBTEXT, alignment=TA_CENTER),
-        ))
-        ts.append(("BACKGROUND",    (i, 0), (i, 0), colors.HexColor(bg)))
-        if i < 6:
-            ts.append(("LINEAFTER", (i, 0), (i, 0), 0.5, colors.white))
+# 9-point star polygon (HTML % coords, y-axis flipped in draw())
+_STAR_PTS = [
+    (50, 0), (61, 19), (82, 12), (79, 35), (98, 45),
+    (82, 61), (92, 82), (69, 80), (61, 100), (50, 83),
+    (39, 100), (31, 80), (8, 82), (18, 61), (2, 45),
+    (21, 35), (18, 12), (39, 19),
+]
 
-    t = Table([badge_row, label_row], colWidths=[bw] * 7)
-    t.setStyle(TableStyle(ts + [
-        ("TOPPADDING",    (0, 0), (-1, 0),  8),
-        ("BOTTOMPADDING", (0, 0), (-1, 0),  8),
-        ("TOPPADDING",    (0, 1), (-1, 1),  4),
-        ("BOTTOMPADDING", (0, 1), (-1, 1),  4),
+
+class StarBadge(Flowable):
+    """CEFR star badge: 9-point star with level text + subtitle below."""
+    STAR_SIZE = 48
+    LABEL_GAP = 6
+    LABEL_H   = 10
+
+    def __init__(self, level, label, bg_color, fg_color):
+        super().__init__()
+        self.level    = level
+        self.label    = label
+        self.bg_color = bg_color
+        self.fg_color = fg_color
+        self.width    = self.STAR_SIZE
+        self.height   = self.STAR_SIZE + self.LABEL_GAP + self.LABEL_H
+
+    def draw(self):
+        c = self.canv
+        size = self.STAR_SIZE
+        star_bottom = self.LABEL_GAP + self.LABEL_H
+
+        # Star shape
+        c.setFillColor(self.bg_color)
+        p = c.beginPath()
+        for i, (px, py) in enumerate(_STAR_PTS):
+            x = size * px / 100
+            y = star_bottom + size * (100 - py) / 100
+            (p.moveTo if i == 0 else p.lineTo)(x, y)
+        p.close()
+        c.drawPath(p, fill=1, stroke=0)
+
+        # Level text in center of star
+        cx = size / 2
+        cy = star_bottom + size / 2
+        c.setFillColor(self.fg_color)
+        if " " in self.level:
+            parts = self.level.split(" ", 1)
+            c.setFont("Helvetica-Bold", 8)
+            c.drawCentredString(cx, cy + 1,  parts[0])
+            c.drawCentredString(cx, cy - 8,  parts[1])
+        else:
+            c.setFont("Helvetica-Bold", 12)
+            c.drawCentredString(cx, cy - 4, self.level)
+
+        # Subtitle label below star
+        c.setFillColor(SUBTEXT)
+        c.setFont("Helvetica", 8)
+        c.drawCentredString(cx, 0, self.label)
+
+
+def _cefr_legend():
+    """Row of 7 star-shaped CEFR level badges."""
+    badges = [
+        StarBadge(lvl, sub, colors.HexColor(bg), colors.HexColor(fg))
+        for lvl, bg, fg, sub in _CEFR_LEGEND
+    ]
+    bw = USABLE / 7
+    t = Table([badges], colWidths=[bw] * 7)
+    t.setStyle(TableStyle([
         ("ALIGN",         (0, 0), (-1, -1), "CENTER"),
         ("VALIGN",        (0, 0), (-1, -1), "MIDDLE"),
-        ("BOX",           (0, 0), (-1, 0),  0.5, RULE),
+        ("TOPPADDING",    (0, 0), (-1, -1), 14),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 14),
+        ("BOX",           (0, 0), (-1, -1), 0.5, RULE),
     ]))
     return t
 
@@ -361,75 +404,59 @@ L_MARGIN     = 40   # must match SimpleDocTemplate leftMargin
 
 
 class CoverPanel(Flowable):
-    """Full-bleed lavender panel: iMocha logo + orbit illustration + title — drawn with primitives."""
-    PANEL_H = 430
+    """Full-bleed lavender hero: iMocha logo top-left, illustration, AI-English Pro title.
+    Lavender extends ABOVE the flowable bounds to cover the page's topMargin area."""
+    PANEL_H = 500
+    TOP_EXT = 30   # matches SimpleDocTemplate topMargin — extends lavender to page top edge
 
-    def __init__(self):
+    def __init__(self, illus_path=None):
         super().__init__()
+        self.illus_path = illus_path
         self.width  = USABLE
         self.height = self.PANEL_H
 
     def draw(self):
         c = self.canv
+        W_ = self.width
+        H_ = self.PANEL_H
+        EXT = self.TOP_EXT
 
-        # Full-bleed lavender background
+        # Full-bleed lavender — extends beyond flowable top to reach page edge
         c.setFillColor(LAVENDER)
-        c.rect(-L_MARGIN, 0, W, self.PANEL_H, fill=1, stroke=0)
+        c.rect(-L_MARGIN, 0, W, H_ + EXT, fill=1, stroke=0)
 
-        # iMocha logo — top-left
-        logo_h = 28
+        # iMocha logo — top-left of lavender, larger and closer to page top
+        logo_h = 40
         logo_w = round(logo_h * 759 / 354)
         if os.path.exists(LOGO_FULL):
-            c.drawImage(LOGO_FULL, 0, self.PANEL_H - logo_h - 18,
+            c.drawImage(LOGO_FULL, 0, H_ + EXT - logo_h - 18,
                         width=logo_w, height=logo_h, mask='auto')
 
-        # ── Orbit scene ────────────────────────────────────────────────────────
-        cx = USABLE / 2        # horizontal centre of scene
-        cy = 218               # vertical centre (from panel bottom)
+        # Illustration image — below the logo, aspect-preserved
+        if self.illus_path and os.path.exists(self.illus_path):
+            box_x = 20
+            box_y = 120
+            box_w = W_ - 40
+            box_h = (H_ + EXT) - logo_h - 50 - box_y   # leave space for logo and title
+            c.drawImage(
+                self.illus_path, box_x, box_y,
+                width=box_w, height=box_h,
+                mask='auto', preserveAspectRatio=True, anchor='c',
+            )
 
-        # Concentric orbit rings
-        orbit_col = colors.HexColor("#D8C4DC")
-        for r in (55, 105, 158, 205):
-            c.setStrokeColor(orbit_col)
-            c.setLineWidth(0.6)
-            c.circle(cx, cy, r, fill=0, stroke=1)
-
-        # Avatars: (dx, dy, radius, fill_color) — positions mirror HTML reference
-        avatars = [
-            (   0,    0, 23, colors.HexColor("#EF4444")),   # centre
-            (  68,   84, 20, colors.HexColor("#4C1D95")),   # top-right
-            ( -95,   42, 20, colors.HexColor("#60A5FA")),   # left
-            (  22,   78, 17, colors.HexColor("#7DD3FC")),   # upper-mid
-            ( 148,   -8, 20, colors.HexColor("#93C5FD")),   # right
-            (-112,  -78, 20, colors.HexColor("#4C1D95")),   # lower-left
-            (  96, -122, 20, colors.HexColor("#60A5FA")),   # lower-right
-        ]
-        for dx, dy, r, fill in avatars:
-            ax, ay = cx + dx, cy + dy
-            c.setFillColor(fill)
-            c.circle(ax, ay, r, fill=1, stroke=0)
-            # White ring border
-            c.setStrokeColor(colors.white)
-            c.setLineWidth(2)
-            c.circle(ax, ay, r, fill=0, stroke=1)
-            # Small highlight dot
-            c.setFillColor(colors.HexColor("#FFFFFF"))
-            c.circle(ax + r * 0.28, ay + r * 0.28, r * 0.18, fill=1, stroke=0)
-
-        # "AI-English Pro" title — bottom of lavender panel
+        # "AI-English Pro" title — bottom-left of hero
         c.setFillColor(SOFT_PURPLE)
-        c.setFont("Helvetica-Bold", 32)
-        c.drawString(0, 26, "AI-English Pro")
+        c.setFont("Helvetica-Bold", 42)
+        c.drawString(0, 42, "AI-English Pro")
 
 
 def _cover_page(candidate: dict) -> list:
     e = []
 
-    # Full-bleed lavender panel drawn entirely with primitives
-    e.append(CoverPanel())
-
-    # ── Candidate info on white ────────────────────────────────────────────────
-    e.append(Spacer(1, 20))
+    # Full-bleed lavender hero (logo + illustration + title)
+    illus = os.path.join(_HERE, "cover_illustration.png")
+    e.append(CoverPanel(illus_path=illus if os.path.exists(illus) else None))
+    e.append(Spacer(1, 26))
 
     COL = 240
     info = [
