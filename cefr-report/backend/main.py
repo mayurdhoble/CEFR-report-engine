@@ -1,4 +1,5 @@
 import io
+import logging
 import os
 import uuid
 from datetime import datetime
@@ -18,6 +19,13 @@ from report_generator import generate_reading_report
 from scoring import run_reading_pass_chain, run_listening_pass_chain, run_writing_score
 
 load_dotenv()
+
+logging.basicConfig(
+    level=os.getenv("LOG_LEVEL", "INFO"),
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+)
+logger = logging.getLogger("cefr")
+
 Base.metadata.create_all(bind=engine)
 
 # ── Idempotent migration: add Writing columns if they don't exist ────────────
@@ -29,14 +37,22 @@ with engine.begin() as conn:
 
 BASE_URL = os.getenv("BASE_URL", "http://localhost:8000")
 
+# CORS: comma-separated list of allowed origins via FRONTEND_ORIGINS env var.
+# Default keeps local dev working; production should set explicit origins.
+_origins_env = os.getenv(
+    "FRONTEND_ORIGINS",
+    "http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173",
+)
+ALLOWED_ORIGINS = [o.strip() for o in _origins_env.split(",") if o.strip()]
+
 app = FastAPI(title="CEFR Report Engine", version="1.0.0")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST"],
+    allow_headers=["Content-Type"],
 )
 
 # ── Column name aliases (handles slight CSV header variations) ─────────────────
@@ -68,6 +84,7 @@ async def upload_csv(file: UploadFile = File(...)):
     """
     content = await file.read()
     filename = file.filename or ""
+    logger.info("Upload received: filename=%s size=%d bytes", filename, len(content))
 
     # Parse file
     try:
@@ -76,7 +93,10 @@ async def upload_csv(file: UploadFile = File(...)):
         else:
             df = pd.read_csv(io.BytesIO(content))
     except Exception as e:
+        logger.exception("File parse failed for %s", filename)
         raise HTTPException(status_code=400, detail=f"Could not parse file: {e}")
+
+    logger.info("Parsed %d rows from %s", len(df), filename)
 
     # Strip trailing/leading spaces from column names (common in iMocha exports)
     df.columns = df.columns.str.strip()
@@ -136,7 +156,37 @@ async def upload_csv(file: UploadFile = File(...)):
         }
 
         # ── Generate PDF ───────────────────────────────────────────────────
-        pdf_bytes = generate_reading_report(candidate, reading_scoring, listening_scoring, writing_scoring)
+        try:
+            pdf_bytes = generate_reading_report(
+                candidate, reading_scoring, listening_scoring, writing_scoring,
+            )
+            if not pdf_bytes:
+                raise ValueError("generator returned empty bytes")
+        except Exception as err:
+            logger.exception(
+                "PDF generation failed for candidate %s (%s); skipping row.",
+                candidate["name"], candidate["id"],
+            )
+            report_links.append("")
+            results.append({
+                "candidate_name":          candidate["name"],
+                "candidate_id":            candidate["id"],
+                "reading_cefr_level":      reading_scoring["cefr_display"],
+                "reading_cefr_total_score": reading_scoring["performance_pct"],
+                "reading_scale_score":     reading_scoring["scale_score"],
+                "reading_scale_cefr":      reading_scoring["cefr_display"],
+                "listening_cefr_level":    listening_scoring["cefr_display"],
+                "listening_cefr_total_score": listening_scoring["performance_pct"],
+                "listening_scale_score":   listening_scoring["scale_score"],
+                "listening_scale_cefr":    listening_scoring["cefr_display"],
+                "writing_score":           writing_scoring["performance_pct"],
+                "writing_cefr":            writing_scoring["cefr_display"],
+                "writing_scale":           writing_scoring["scale_score"],
+                "writing_scale_cefr":      writing_scoring["cefr_display"],
+                "report_link":             "",
+                "error":                   f"PDF generation failed: {err}",
+            })
+            continue
 
         # ── Persist to DB ──────────────────────────────────────────────────
         report_uuid = str(uuid.uuid4())
@@ -194,6 +244,12 @@ async def upload_csv(file: UploadFile = File(...)):
         })
 
     db.close()
+
+    failed = sum(1 for r in results if r.get("error"))
+    logger.info(
+        "Upload complete: %d rows, %d succeeded, %d failed",
+        len(results), len(results) - failed, failed,
+    )
 
     # ── Append scoring columns and Report_Link, then return modified Excel ─
     df["Reading - CEFR Level"]       = [r["reading_cefr_level"]       for r in results]
