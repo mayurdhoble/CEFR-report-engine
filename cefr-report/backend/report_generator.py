@@ -38,13 +38,13 @@ DARK_HDR = colors.HexColor("#1F2937")
 
 BADGE_COLORS = {
     "BelowA2": colors.HexColor("#B0BEC5"),
-    "A1":      colors.HexColor("#90CAF9"),
-    "A2":      colors.HexColor("#64B5F6"),
+    "A1":      colors.HexColor("#AECEF0"),
+    "A2":      colors.HexColor("#7DB8E8"),
     "B1":      colors.HexColor("#4A90D9"),
-    "B2":      colors.HexColor("#2C6DB5"),
-    "B2+":     colors.HexColor("#1E4FA0"),
-    "C1":      colors.HexColor("#1A237E"),
-    "C2":      colors.HexColor("#0D0D3D"),
+    "B2":      colors.HexColor("#1C5FAA"),
+    "B2+":     colors.HexColor("#1C5FAA"),
+    "C1":      colors.HexColor("#1A3A6B"),
+    "C2":      colors.HexColor("#0D1B4E"),
 }
 
 
@@ -139,15 +139,15 @@ def _section_heading(text: str):
     return t
 
 
-# CEFR legend row (Pre A1 → C2) shown below score chart
+# CEFR legend row (Pre A1 → C2) — colors match the chart band strip
 _CEFR_LEGEND = [
-    ("Pre A1", "#BFDBFE", "#1E3A8A", "Beginner"),
-    ("A1",     "#60A5FA", "#FFFFFF", "Beginner"),
-    ("A2",     "#3B82F6", "#FFFFFF", "Elementary"),
-    ("B1",     "#2563EB", "#FFFFFF", "Intermediate"),
-    ("B2",     "#1D4ED8", "#FFFFFF", "Upper-Int"),
-    ("C1",     "#1E3A8A", "#FFFFFF", "Advanced"),
-    ("C2",     "#1E1B4B", "#FFFFFF", "Mastery"),
+    ("Pre A1", "#D6E4F7", "#1F2937", "Beginner"),
+    ("A1",     "#AECEF0", "#1F2937", "Beginner"),
+    ("A2",     "#7DB8E8", "#FFFFFF", "Elementary"),
+    ("B1",     "#4A90D9", "#FFFFFF", "Intermediate"),
+    ("B2",     "#1C5FAA", "#FFFFFF", "Upper-Int"),
+    ("C1",     "#1A3A6B", "#FFFFFF", "Advanced"),
+    ("C2",     "#0D1B4E", "#FFFFFF", "Mastery"),
 ]
 
 # 9-point star polygon (HTML % coords, y-axis flipped in draw())
@@ -161,9 +161,9 @@ _STAR_PTS = [
 
 class StarBadge(Flowable):
     """CEFR star badge: 9-point star with level text + subtitle below."""
-    STAR_SIZE = 48
+    STAR_SIZE = 56
     LABEL_GAP = 6
-    LABEL_H   = 10
+    LABEL_H   = 12
 
     def __init__(self, level, label, bg_color, fg_color):
         super().__init__()
@@ -195,17 +195,17 @@ class StarBadge(Flowable):
         c.setFillColor(self.fg_color)
         if " " in self.level:
             parts = self.level.split(" ", 1)
-            c.setFont("Helvetica-Bold", 8)
-            c.drawCentredString(cx, cy + 1,  parts[0])
+            c.setFont("Helvetica-Bold", 9)
+            c.drawCentredString(cx, cy + 2,  parts[0])
             c.drawCentredString(cx, cy - 8,  parts[1])
         else:
-            c.setFont("Helvetica-Bold", 12)
-            c.drawCentredString(cx, cy - 4, self.level)
+            c.setFont("Helvetica-Bold", 14)
+            c.drawCentredString(cx, cy - 5, self.level)
 
         # Subtitle label below star
-        c.setFillColor(SUBTEXT)
-        c.setFont("Helvetica", 8)
-        c.drawCentredString(cx, 0, self.label)
+        c.setFillColor(HEADING)
+        c.setFont("Helvetica-Bold", 8)
+        c.drawCentredString(cx, 1, self.label)
 
 
 def _cefr_legend():
@@ -249,14 +249,14 @@ class CEFRProfileChart(Flowable):
     ]
 
     _PROFICIENCY = [
-        (80,  140, "Basic"),
-        (140, 180, "Independent"),
-        (180, 230, "Proficient"),
+        (100, 140, "Basic"),        # A1–A2
+        (140, 180, "Independent"),  # B1–B2
+        (180, 230, "Proficient"),   # C1–C2
     ]
 
     _SKILLS = ["Speaking", "Listening", "Reading", "Writing"]
 
-    def __init__(self, skills, width=490, height=280):
+    def __init__(self, skills, width=490, height=310):
         """
         skills: list of (skill_name, scale_score, fill_color)
                 Only named skills will have an arrow drawn; others left empty.
@@ -266,14 +266,14 @@ class CEFRProfileChart(Flowable):
         self.width  = width
         self.height = height
 
-        self._prof_w  = 26     # rotated proficiency label column
-        self._band_w  = 52     # coloured CEFR band strip
-        self._scale_w = 32     # Cambridge scale numbers
-        self._hdr_h   = 22     # column header area at top
+        self._prof_w  = 40     # rotated proficiency label column
+        self._band_w  = 54     # coloured CEFR band strip
+        self._scale_w = 36     # Cambridge scale numbers
+        self._hdr_h   = 32     # column header area at top
         self._grid_x  = self._prof_w + self._band_w + self._scale_w
         self._grid_w  = width - self._grid_x
-        self._ch_bot  = 6
-        self._ch_top  = height - self._hdr_h - 6
+        self._ch_bot  = 8
+        self._ch_top  = height - self._hdr_h - 8
         self._ch_h    = self._ch_top - self._ch_bot
 
     def _y(self, val):
@@ -281,8 +281,15 @@ class CEFRProfileChart(Flowable):
         return self._ch_bot + (val - 80) / (230 - 80) * self._ch_h
 
     def draw(self):
-        c    = self.canv
+        c     = self.canv
         col_w = self._grid_w / len(self._SKILLS)
+
+        # ── Proficiency strip: grey background only for A1–C2, white for Pre A1 ─
+        c.setFillColor(colors.white)
+        c.rect(0, self._ch_bot, self._prof_w, self._ch_h, fill=1, stroke=0)
+        y_a1 = self._y(100)   # start of A1 band
+        c.setFillColor(colors.HexColor("#F3F4F6"))
+        c.rect(0, y_a1, self._prof_w, self._ch_top - y_a1, fill=1, stroke=0)
 
         # ── Left panel: coloured CEFR band stripes ────────────────────────────
         for i in range(len(self._BANDS) - 1):
@@ -294,17 +301,26 @@ class CEFRProfileChart(Flowable):
             c.setFillColor(bg)
             c.rect(self._prof_w, yb, self._band_w, bh, fill=1, stroke=0)
 
-            txt_col = colors.white if i >= 3 else colors.HexColor("#1F2937")
+            txt_col = colors.white if i >= 2 else colors.HexColor("#1F2937")
             c.setFillColor(txt_col)
-            c.setFont("Helvetica-Bold", 7)
-            c.drawCentredString(self._prof_w + self._band_w / 2, yb + bh / 2 - 3, lbl)
+            c.setFont("Helvetica-Bold", 8)
+            c.drawCentredString(self._prof_w + self._band_w / 2, yb + bh / 2 - 4, lbl)
+
+        # ── Proficiency group dividers (dashed lines at B1=140 and C1=180) ────
+        for boundary in (140, 180):
+            yb = self._y(boundary)
+            c.setStrokeColor(colors.HexColor("#9CA3AF"))
+            c.setLineWidth(0.6)
+            c.setDash(3, 3)
+            c.line(0, yb, self._prof_w + self._band_w, yb)
+        c.setDash()
 
         # ── Left panel: rotated proficiency group labels ───────────────────────
         for bot, top, lbl in self._PROFICIENCY:
             mid = (self._y(bot) + self._y(top)) / 2
             c.saveState()
             c.setFillColor(HEADING)
-            c.setFont("Helvetica-Bold", 7)
+            c.setFont("Helvetica-Bold", 9)
             c.translate(self._prof_w / 2, mid)
             c.rotate(90)
             c.drawCentredString(0, 0, lbl)
@@ -324,13 +340,18 @@ class CEFRProfileChart(Flowable):
         for val in range(80, 231, 10):
             y = self._y(val)
             c.setFillColor(SUBTEXT)
-            c.setFont("Helvetica", 6)
-            c.drawRightString(self._grid_x - 4, y - 2.5, str(val))
+            c.setFont("Helvetica", 7)
+            c.drawRightString(self._grid_x - 4, y - 3, str(val))
             c.setStrokeColor(colors.HexColor("#D1D5DB"))
             c.setLineWidth(0.3)
             c.setDash(2, 3)
             c.line(self._grid_x, y, self.width, y)
         c.setDash()
+
+        # ── Outer border around the full chart ────────────────────────────────
+        c.setStrokeColor(colors.HexColor("#E5E7EB"))
+        c.setLineWidth(0.5)
+        c.rect(0, self._ch_bot, self.width, self._ch_h, fill=0, stroke=1)
 
         # ── Vertical column dividers ──────────────────────────────────────────
         for i in range(1, len(self._SKILLS)):
@@ -340,17 +361,33 @@ class CEFRProfileChart(Flowable):
             c.line(x, self._ch_bot, x, self._ch_top)
 
         # ── Column headers ────────────────────────────────────────────────────
+        hdr_y = self._ch_top + 8
+
+        # CEFR panel header (spans proficiency + band strip)
+        cefr_mid = (self._prof_w + self._band_w) / 2
+        c.setFillColor(HEADING)
+        c.setFont("Helvetica-Bold", 6)
+        c.drawCentredString(cefr_mid, hdr_y + 10, "Common European")
+        c.drawCentredString(cefr_mid, hdr_y + 3,  "Framework (CEFR)")
+
+        # Cambridge English Scale header
+        scale_mid = self._prof_w + self._band_w + self._scale_w / 2
+        c.setFont("Helvetica-Bold", 6)
+        c.drawCentredString(scale_mid, hdr_y + 10, "Cambridge")
+        c.drawCentredString(scale_mid, hdr_y + 3,  "English Scale")
+
+        # Skill column headers
         for i, name in enumerate(self._SKILLS):
             cx = self._grid_x + i * col_w + col_w / 2
             c.setFillColor(HEADING)
-            c.setFont("Helvetica-Bold", 8)
-            c.drawCentredString(cx, self._ch_top + 8, name)
+            c.setFont("Helvetica-Bold", 9)
+            c.drawCentredString(cx, hdr_y + 5, name)
 
         # ── Left-pointing arrow markers for each scored skill ─────────────────
         col_idx = {n: i for i, n in enumerate(self._SKILLS)}
-        aw  = col_w * 0.75   # arrow body width
-        ah  = 16             # arrow total height
-        tip = ah * 0.5       # how far the tip protrudes left of body
+        aw  = col_w * 0.78   # arrow body width
+        ah  = 18             # arrow total height
+        tip = ah * 0.45      # how far the tip protrudes left of body
 
         for name, (_, scale_score, fill) in self.skills_map.items():
             idx = col_idx.get(name)
@@ -359,29 +396,29 @@ class CEFRProfileChart(Flowable):
             col_cx = self._grid_x + idx * col_w + col_w / 2
             y      = self._y(scale_score)
 
-            lx = col_cx - aw / 2        # left edge of rectangular body
-            rx = col_cx + aw / 2        # right edge
-            tx = lx - tip               # tip x (leftmost point)
+            lx = col_cx - aw / 2
+            rx = col_cx + aw / 2
+            tx = lx - tip
 
             c.setFillColor(fill)
             c.setStrokeColor(fill)
             p = c.beginPath()
-            p.moveTo(tx, y)             # tip
-            p.lineTo(lx, y + ah / 2)   # body top-left
-            p.lineTo(rx, y + ah / 2)   # body top-right
-            p.lineTo(rx, y - ah / 2)   # body bottom-right
-            p.lineTo(lx, y - ah / 2)   # body bottom-left
+            p.moveTo(tx, y)
+            p.lineTo(lx, y + ah / 2)
+            p.lineTo(rx, y + ah / 2)
+            p.lineTo(rx, y - ah / 2)
+            p.lineTo(lx, y - ah / 2)
             p.close()
             c.drawPath(p, fill=1, stroke=0)
 
             c.setFillColor(colors.white)
-            c.setFont("Helvetica-Bold", 8)
-            c.drawCentredString(col_cx + tip / 2, y - 3.5, str(scale_score))
+            c.setFont("Helvetica-Bold", 9)
+            c.drawCentredString(col_cx + tip / 2, y - 4, str(scale_score))
 
 
 # ── CEFR badge flowable ────────────────────────────────────────────────────────
 class CEFRBadge(Flowable):
-    def __init__(self, level, width=72, height=22):
+    def __init__(self, level, width=82, height=24):
         super().__init__()
         self.level  = level
         self.width  = width
@@ -389,11 +426,12 @@ class CEFRBadge(Flowable):
 
     def draw(self):
         bg = BADGE_COLORS.get(self.level, PURPLE)
+        fg = colors.HexColor("#1F2937") if self.level in ("A1", "A2", "Pre A1", "BelowA2") else colors.white
         self.canv.setFillColor(bg)
-        self.canv.roundRect(0, 0, self.width, self.height, 5, fill=1, stroke=0)
-        self.canv.setFillColor(colors.white)
-        self.canv.setFont("Helvetica-Bold", 9)
-        self.canv.drawCentredString(self.width / 2, 6, f"CEFR: {self.level}")
+        self.canv.roundRect(0, 0, self.width, self.height, 6, fill=1, stroke=0)
+        self.canv.setFillColor(fg)
+        self.canv.setFont("Helvetica-Bold", 10)
+        self.canv.drawCentredString(self.width / 2, 7, f"CEFR: {self.level}")
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -511,7 +549,7 @@ def _score_analysis_page(reading_scoring: dict, listening_scoring: dict, writing
             ("Writing",   int(writing_scoring.get("scale_score",   120)), HEADING),
         ],
         width=USABLE - 20,
-        height=285,
+        height=310,
     )
     card = Table([[chart]], colWidths=[USABLE])
     card.setStyle(TableStyle([
@@ -567,9 +605,9 @@ def _skill_section_row(section_num: int, label: str, scoring: dict) -> Table:
         title_tbl,
         Spacer(1, 6),
         Table(
-            [[CEFRBadge(scoring["cefr_display"], width=72, height=22),
+            [[CEFRBadge(scoring["cefr_display"], width=82, height=24),
               Paragraph(scoring["proficiency_label"], STYLES["prof"])]],
-            colWidths=[80, INNER_L - 80],
+            colWidths=[90, INNER_L - 90],
             style=[("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
                    ("LEFTPADDING", (0, 0), (-1, -1), 0),
                    ("RIGHTPADDING", (0, 0), (-1, -1), 0),
