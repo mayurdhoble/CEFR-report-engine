@@ -169,22 +169,22 @@ async def upload_csv(file: UploadFile = File(...)):
             )
             report_links.append("")
             results.append({
-                "candidate_name":          candidate["name"],
-                "candidate_id":            candidate["id"],
-                "reading_cefr_level":      reading_scoring["cefr_display"],
-                "reading_cefr_total_score": reading_scoring["performance_pct"],
-                "reading_scale_score":     reading_scoring["scale_score"],
-                "reading_scale_cefr":      reading_scoring["cefr_display"],
-                "listening_cefr_level":    listening_scoring["cefr_display"],
-                "listening_cefr_total_score": listening_scoring["performance_pct"],
-                "listening_scale_score":   listening_scoring["scale_score"],
-                "listening_scale_cefr":    listening_scoring["cefr_display"],
-                "writing_score":           writing_scoring["performance_pct"],
-                "writing_cefr":            writing_scoring["cefr_display"],
-                "writing_scale":           writing_scoring["scale_score"],
-                "writing_scale_cefr":      writing_scoring["cefr_display"],
-                "report_link":             "",
-                "error":                   f"PDF generation failed: {err}",
+                "candidate_name":             candidate["name"],
+                "candidate_id":               candidate["id"],
+                "reading_cefr_level":         reading_scoring["cefr_display"],
+                "reading_normalized_pct":     reading_scoring["normalized_pct"],
+                "reading_scale_score":        reading_scoring["scale_score"],
+                "reading_scale_cefr":         reading_scoring["cefr_display"],
+                "listening_cefr_level":       listening_scoring["cefr_display"],
+                "listening_normalized_pct":   listening_scoring["normalized_pct"],
+                "listening_scale_score":      listening_scoring["scale_score"],
+                "listening_scale_cefr":       listening_scoring["cefr_display"],
+                "writing_normalized_pct":     writing_scoring["normalized_pct"],
+                "writing_cefr":               writing_scoring["cefr_display"],
+                "writing_scale":              writing_scoring["scale_score"],
+                "writing_scale_cefr":         writing_scoring["cefr_display"],
+                "report_link":                "",
+                "error":                      f"PDF generation failed: {err}",
             })
             continue
 
@@ -226,21 +226,21 @@ async def upload_csv(file: UploadFile = File(...)):
         link = f"{BASE_URL}/report/{report_uuid}"
         report_links.append(link)
         results.append({
-            "candidate_name":          candidate["name"],
-            "candidate_id":            candidate["id"],
-            "reading_cefr_level":      reading_scoring["cefr_display"],
-            "reading_cefr_total_score": reading_scoring["performance_pct"],
-            "reading_scale_score":     reading_scoring["scale_score"],
-            "reading_scale_cefr":      reading_scoring["cefr_display"],
-            "listening_cefr_level":    listening_scoring["cefr_display"],
-            "listening_cefr_total_score": listening_scoring["performance_pct"],
-            "listening_scale_score":   listening_scoring["scale_score"],
-            "listening_scale_cefr":    listening_scoring["cefr_display"],
-            "writing_score":           writing_scoring["performance_pct"],
-            "writing_cefr":            writing_scoring["cefr_display"],
-            "writing_scale":           writing_scoring["scale_score"],
-            "writing_scale_cefr":      writing_scoring["cefr_display"],
-            "report_link":             link,
+            "candidate_name":           candidate["name"],
+            "candidate_id":             candidate["id"],
+            "reading_cefr_level":       reading_scoring["cefr_display"],
+            "reading_normalized_pct":   reading_scoring["normalized_pct"],
+            "reading_scale_score":      reading_scoring["scale_score"],
+            "reading_scale_cefr":       reading_scoring["cefr_display"],
+            "listening_cefr_level":     listening_scoring["cefr_display"],
+            "listening_normalized_pct": listening_scoring["normalized_pct"],
+            "listening_scale_score":    listening_scoring["scale_score"],
+            "listening_scale_cefr":     listening_scoring["cefr_display"],
+            "writing_normalized_pct":   writing_scoring["normalized_pct"],
+            "writing_cefr":             writing_scoring["cefr_display"],
+            "writing_scale":            writing_scoring["scale_score"],
+            "writing_scale_cefr":       writing_scoring["cefr_display"],
+            "report_link":              link,
         })
 
     db.close()
@@ -252,19 +252,20 @@ async def upload_csv(file: UploadFile = File(...)):
     )
 
     # ── Append scoring columns and Report_Link, then return modified Excel ─
-    df["Reading - CEFR Level"]       = [r["reading_cefr_level"]       for r in results]
-    df["Reading - CEFR Total Score"] = [r["reading_cefr_total_score"] for r in results]
-    df["Reading Scale Score"]        = [r["reading_scale_score"]      for r in results]
-    df["Reading Scale CEFR"]         = [r["reading_scale_cefr"]       for r in results]
-    df["Listening - CEFR Level"]       = [r["listening_cefr_level"]       for r in results]
-    df["Listening - CEFR Total Score"] = [r["listening_cefr_total_score"] for r in results]
-    df["Listening Scale Score"]        = [r["listening_scale_score"]      for r in results]
-    df["Listening Scale CEFR"]         = [r["listening_scale_cefr"]       for r in results]
-    df["Writing Score"]                = [r["writing_score"]              for r in results]
-    df["Writing CEFR"]                 = [r["writing_cefr"]               for r in results]
-    df["Writing Scale"]                = [r["writing_scale"]              for r in results]
-    df["Writing Scale CEFR"]           = [r["writing_scale_cefr"]         for r in results]
+    df["Reading - CEFR Level"]               = [r["reading_cefr_level"]       for r in results]
+    df["Reading - Scale Score Percentage"]   = [r["reading_normalized_pct"]   for r in results]
+    df["Reading Scale Score"]                = [r["reading_scale_score"]      for r in results]
+    df["Reading Scale CEFR"]                 = [r["reading_scale_cefr"]       for r in results]
+    df["Listening - CEFR Level"]             = [r["listening_cefr_level"]       for r in results]
+    df["Listening - Scale Score Percentage"] = [r["listening_normalized_pct"]   for r in results]
+    df["Listening Scale Score"]              = [r["listening_scale_score"]      for r in results]
+    df["Listening Scale CEFR"]               = [r["listening_scale_cefr"]       for r in results]
+    df["Writing - Scale Score Percentage"]   = [r["writing_normalized_pct"]     for r in results]
+    df["Writing CEFR"]                       = [r["writing_cefr"]               for r in results]
+    df["Writing Scale"]                      = [r["writing_scale"]              for r in results]
+    df["Writing Scale CEFR"]                 = [r["writing_scale_cefr"]         for r in results]
     df["Report_Link"]                  = report_links
+    df.drop(columns=[c for c in ["_Scenario_Description"] if c in df.columns], inplace=True)
     out = io.BytesIO()
     df.to_excel(out, index=False)
     out.seek(0)

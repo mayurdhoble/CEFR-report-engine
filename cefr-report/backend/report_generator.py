@@ -506,9 +506,9 @@ def _score_analysis_page(reading_scoring: dict, listening_scoring: dict, writing
     # Profile chart — DARK_HDR for Listening, PURPLE for Reading, ORANGE for Writing
     chart = CEFRProfileChart(
         skills=[
-            ("Listening", int(listening_scoring.get("scale_score", 120)), DARK_HDR),
-            ("Reading",   int(reading_scoring.get("scale_score",   120)), PURPLE),
-            ("Writing",   int(writing_scoring.get("scale_score",   120)), ORANGE),
+            ("Listening", int(listening_scoring.get("scale_score", 120)), HEADING),
+            ("Reading",   int(reading_scoring.get("scale_score",   120)), HEADING),
+            ("Writing",   int(writing_scoring.get("scale_score",   120)), HEADING),
         ],
         width=USABLE - 20,
         height=285,
@@ -546,16 +546,16 @@ def _skill_section_row(section_num: int, label: str, scoring: dict) -> Table:
     RIGHT_W = 175
     INNER_L = 290
 
-    pct = scoring["performance_pct"]
+    pct = scoring["normalized_pct"]
 
-    # Title line: section label left, total score right-aligned
+    # Title line: section label left, normalized scale score percentage right-aligned
     title_tbl = Table([[
         Paragraph(
             f'<font color="#6B7280">Section {section_num}: </font>'
             f'<b><font color="#2D2D6B">{label}</font></b>',
             STYLES["skill_lbl"],
         ),
-        Paragraph(f'Total Score: <b>{pct}/100</b>', STYLES["score_r"]),
+        Paragraph(f'Scale Score Percentage: <b>{pct}</b>', STYLES["score_r"]),
     ]], colWidths=[LEFT_W - 130, 120])
     title_tbl.setStyle(TableStyle([
         ("VALIGN",      (0, 0), (-1, -1), "MIDDLE"),

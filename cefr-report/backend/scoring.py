@@ -206,13 +206,15 @@ def run_writing_score(
     else:
         display = "Pre A1"
 
-    band        = WRITING_BANDS[display]
-    scale_score = band["band_start"] + round(weighted * band["band_range"] / 100)
+    band            = WRITING_BANDS[display]
+    scale_score     = band["band_start"] + round(weighted * band["band_range"] / 100)
+    normalized_pct  = round((scale_score - 80) / 150 * 100, 1)
 
     return {
         "cefr_display":         display,
         "scale_score":          scale_score,
         "performance_pct":      weighted,
+        "normalized_pct":       normalized_pct,
         "proficiency_label":    PROFICIENCY_LABELS.get(display, ""),
         "capability_statement": WRITING_CAPABILITY.get(display, ""),
         "skill_definition":     WRITING_SKILL_DEFINITION,
@@ -260,11 +262,13 @@ def run_listening_pass_chain(
     denominator     = band["denominator"]
     performance_pct = round(total_marks / denominator * 100, 1)
     scale_score     = band["band_start"] + round(performance_pct * band["band_range"] / 100)
+    normalized_pct  = round((scale_score - 80) / 150 * 100, 1)
 
     return {
         "cefr_display":       display,
         "scale_score":        scale_score,
         "performance_pct":    performance_pct,
+        "normalized_pct":     normalized_pct,
         "total_marks":        total_marks,
         "denominator":        denominator,
         "proficiency_label":  PROFICIENCY_LABELS.get(display, ""),
@@ -339,18 +343,20 @@ def run_reading_pass_chain(
         display = "B2+"
         total_marks = a2_candidate + b1_candidate + b2_candidate
 
-    band = READING_BANDS[display]
-    denominator = band["denominator"]
+    band            = READING_BANDS[display]
+    denominator     = band["denominator"]
     performance_pct = round(total_marks / denominator * 100, 1)
-    scale_score = band["band_start"] + round(performance_pct * band["band_range"] / 100)
+    scale_score     = band["band_start"] + round(performance_pct * band["band_range"] / 100)
+    normalized_pct  = round((scale_score - 80) / 150 * 100, 1)
 
     return {
-        "cefr_display": display,
-        "scale_score": scale_score,
-        "performance_pct": performance_pct,
-        "total_marks": total_marks,
-        "denominator": denominator,
-        "proficiency_label": PROFICIENCY_LABELS.get(display, ""),
+        "cefr_display":       display,
+        "scale_score":        scale_score,
+        "performance_pct":    performance_pct,
+        "normalized_pct":     normalized_pct,
+        "total_marks":        total_marks,
+        "denominator":        denominator,
+        "proficiency_label":  PROFICIENCY_LABELS.get(display, ""),
         "capability_statement": READING_CAPABILITY.get(display, ""),
-        "skill_definition": READING_SKILL_DEFINITION,
+        "skill_definition":   READING_SKILL_DEFINITION,
     }
