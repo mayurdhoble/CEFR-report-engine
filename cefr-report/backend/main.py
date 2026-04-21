@@ -252,18 +252,15 @@ async def upload_csv(file: UploadFile = File(...)):
     )
 
     # ── Append scoring columns and Report_Link, then return modified Excel ─
-    df["Reading - CEFR Level"]               = [r["reading_cefr_level"]       for r in results]
-    df["Reading - Scale Score Percentage"]   = [r["reading_normalized_pct"]   for r in results]
-    df["Reading Scale Score"]                = [r["reading_scale_score"]      for r in results]
-    df["Reading Scale CEFR"]                 = [r["reading_scale_cefr"]       for r in results]
-    df["Listening - CEFR Level"]             = [r["listening_cefr_level"]       for r in results]
-    df["Listening - Scale Score Percentage"] = [r["listening_normalized_pct"]   for r in results]
-    df["Listening Scale Score"]              = [r["listening_scale_score"]      for r in results]
-    df["Listening Scale CEFR"]               = [r["listening_scale_cefr"]       for r in results]
-    df["Writing - Scale Score Percentage"]   = [r["writing_normalized_pct"]     for r in results]
-    df["Writing CEFR"]                       = [r["writing_cefr"]               for r in results]
-    df["Writing Scale"]                      = [r["writing_scale"]              for r in results]
-    df["Writing Scale CEFR"]                 = [r["writing_scale_cefr"]         for r in results]
+    df["Reading - CEFR Level"]   = [r["reading_cefr_level"]   for r in results]
+    df["Reading Scale Score"]    = [r["reading_scale_score"]  for r in results]
+    df["Reading Scale CEFR"]     = [r["reading_scale_cefr"]   for r in results]
+    df["Listening - CEFR Level"] = [r["listening_cefr_level"] for r in results]
+    df["Listening Scale Score"]  = [r["listening_scale_score"] for r in results]
+    df["Listening Scale CEFR"]   = [r["listening_scale_cefr"] for r in results]
+    df["Writing CEFR"]           = [r["writing_cefr"]         for r in results]
+    df["Writing Scale"]          = [r["writing_scale"]        for r in results]
+    df["Writing Scale CEFR"]     = [r["writing_scale_cefr"]   for r in results]
     df["Report_Link"]                  = report_links
     df.drop(columns=[c for c in ["_Scenario_Description"] if c in df.columns], inplace=True)
     out = io.BytesIO()

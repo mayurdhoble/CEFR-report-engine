@@ -67,7 +67,7 @@ STYLES = {
     "skill_bold": S("sb",     fontName="Helvetica-Bold", fontSize=13, textColor=HEADING),
     "score_r":    S("scr",    fontName="Helvetica-Bold", fontSize=12, textColor=HEADING, alignment=TA_RIGHT),
     "score":      S("sc",     fontName="Helvetica-Bold", fontSize=13, textColor=HEADING),
-    "prof":       S("pr",     fontName="Helvetica",      fontSize=12, textColor=SUBTEXT),
+    "prof":       S("pr",     fontName="Helvetica-Bold", fontSize=12, textColor=SUBTEXT),
     "cap":        S("ca",     fontName="Helvetica",      fontSize=11, textColor=colors.HexColor("#374151"), leading=16),
     "sb_head":    S("sbh",    fontName="Helvetica-Bold", fontSize=13, textColor=HEADING, spaceAfter=4),
     "sb_body":    S("sbb",    fontName="Helvetica",      fontSize=11, textColor=SUBTEXT, leading=16),
@@ -546,16 +546,16 @@ def _skill_section_row(section_num: int, label: str, scoring: dict) -> Table:
     RIGHT_W = 175
     INNER_L = 290
 
-    pct = scoring["normalized_pct"]
+    scale = scoring["scale_score"]
 
-    # Title line: section label left, normalized scale score percentage right-aligned
+    # Title line: section label left, Cambridge scale score right-aligned
     title_tbl = Table([[
         Paragraph(
             f'<font color="#6B7280">Section {section_num}: </font>'
             f'<b><font color="#2D2D6B">{label}</font></b>',
             STYLES["skill_lbl"],
         ),
-        Paragraph(f'Scale Score Percentage: <b>{pct}</b>', STYLES["score_r"]),
+        Paragraph(f'Score : <b>{scale}</b>', STYLES["score_r"]),
     ]], colWidths=[LEFT_W - 130, 120])
     title_tbl.setStyle(TableStyle([
         ("VALIGN",      (0, 0), (-1, -1), "MIDDLE"),
@@ -570,6 +570,11 @@ def _skill_section_row(section_num: int, label: str, scoring: dict) -> Table:
             [[CEFRBadge(scoring["cefr_display"], width=72, height=22),
               Paragraph(scoring["proficiency_label"], STYLES["prof"])]],
             colWidths=[80, INNER_L - 80],
+            style=[("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                   ("LEFTPADDING", (0, 0), (-1, -1), 0),
+                   ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+                   ("TOPPADDING", (0, 0), (-1, -1), 0),
+                   ("BOTTOMPADDING", (0, 0), (-1, -1), 0)],
         ),
         Spacer(1, 10),
         Paragraph(scoring["capability_statement"], STYLES["cap"]),

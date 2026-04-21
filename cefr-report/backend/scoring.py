@@ -22,15 +22,15 @@ READING_BANDS = {
 
 # Human-readable proficiency labels (displayed under the CEFR badge)
 PROFICIENCY_LABELS = {
-    "Pre A1":  "Beginner",
-    "BelowA2": "Beginner",
-    "A1":      "Beginner",
-    "A2":      "Elementary",
-    "B1":      "Intermediate",
-    "B2":      "Upper-intermediate",
-    "B2+":     "Upper-intermediate+",
-    "C1":      "Advanced",
-    "C2":      "Mastery",
+    "Pre A1":  "Beginner User",
+    "BelowA2": "Beginner User",
+    "A1":      "Beginner User",
+    "A2":      "Beginner User",
+    "B1":      "Independent User",
+    "B2":      "Independent User",
+    "B2+":     "Independent User",
+    "C1":      "Proficient User",
+    "C2":      "Proficient User",
 }
 
 # Candidate capability statements for Reading per CEFR outcome
