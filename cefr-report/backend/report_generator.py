@@ -386,7 +386,7 @@ class CEFRProfileChart(Flowable):
 
         # ── Left-pointing arrow markers for each scored skill ─────────────────
         col_idx = {n: i for i, n in enumerate(self._SKILLS)}
-        aw  = col_w * 0.78   # arrow body width
+        aw  = col_w * 0.55   # arrow body width
         ah  = 18             # arrow total height
         tip = ah * 0.45      # how far the tip protrudes left of body
 
