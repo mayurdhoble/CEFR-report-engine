@@ -267,9 +267,9 @@ class CEFRProfileChart(Flowable):
         self.width  = width
         self.height = height
 
-        self._prof_w  = 40     # rotated proficiency label column
-        self._band_w  = 54     # coloured CEFR band strip
-        self._scale_w = 36     # Cambridge scale numbers
+        self._prof_w  = 48     # rotated proficiency label column
+        self._band_w  = 62     # coloured CEFR band strip
+        self._scale_w = 40     # Cambridge scale numbers
         self._hdr_h   = 32     # column header area at top
         self._grid_x  = self._prof_w + self._band_w + self._scale_w
         self._grid_w  = width - self._grid_x
@@ -282,8 +282,11 @@ class CEFRProfileChart(Flowable):
         return self._ch_bot + (val - 80) / (230 - 80) * self._ch_h
 
     def draw(self):
-        c     = self.canv
-        col_w = self._grid_w / len(self._SKILLS)
+        c           = self.canv
+        col_w       = self._grid_w / len(self._SKILLS)
+        equiv_col_w = col_w
+        col_centers = [self._grid_x + j * col_w + col_w / 2
+                       for j in range(len(self._SKILLS))]
 
         # ── Proficiency strip: grey background only for A1–C2, white for Pre A1 ─
         c.setFillColor(colors.white)
@@ -328,6 +331,8 @@ class CEFRProfileChart(Flowable):
             c.restoreState()
 
         # ── Grid area: subtle alternating band backgrounds ────────────────────
+        # Background restricted to equiv_col_w per skill so single-skill charts
+        # don't fill empty grid space beyond the column marker area.
         for i in range(len(self._BANDS) - 1):
             bot = self._BANDS[i][0]
             top = self._BANDS[i + 1][0]
@@ -335,10 +340,12 @@ class CEFRProfileChart(Flowable):
             bh  = self._y(top) - yb
             bg  = colors.HexColor("#F5F7FF") if i % 2 == 0 else colors.HexColor("#EAEDFA")
             c.setFillColor(bg)
-            c.rect(self._grid_x, yb, self._grid_w, bh, fill=1, stroke=0)
+            for j in range(len(self._SKILLS)):
+                col_cx = col_centers[j]
+                c.rect(col_cx - equiv_col_w / 2, yb, equiv_col_w, bh, fill=1, stroke=0)
 
         # ── Scale numbers + dashed horizontal gridlines ───────────────────────
-        for val in range(80, 231, 10):
+        for val in range(100, 231, 10):
             y = self._y(val)
             c.setFillColor(SUBTEXT)
             c.setFont("Helvetica", 7)
@@ -346,7 +353,9 @@ class CEFRProfileChart(Flowable):
             c.setStrokeColor(colors.HexColor("#D1D5DB"))
             c.setLineWidth(0.3)
             c.setDash(2, 3)
-            c.line(self._grid_x, y, self.width, y)
+            for j in range(len(self._SKILLS)):
+                col_cx = col_centers[j]
+                c.line(col_cx - equiv_col_w / 2, y, col_cx + equiv_col_w / 2, y)
         c.setDash()
 
         # ── Outer border around the full chart ────────────────────────────────
@@ -379,22 +388,22 @@ class CEFRProfileChart(Flowable):
 
         # Skill column headers
         for i, name in enumerate(self._SKILLS):
-            cx = self._grid_x + i * col_w + col_w / 2
+            cx = col_centers[i]
             c.setFillColor(HEADING)
             c.setFont("Helvetica-Bold", 9)
             c.drawCentredString(cx, hdr_y + 5, name)
 
         # ── Left-pointing arrow markers for each scored skill ─────────────────
         col_idx = {n: i for i, n in enumerate(self._SKILLS)}
-        aw  = col_w * 0.55   # arrow body width
-        ah  = 18             # arrow total height
-        tip = ah * 0.45      # how far the tip protrudes left of body
+        aw  = equiv_col_w * 0.55
+        ah  = 18
+        tip = ah * 0.45
 
         for name, (_, scale_score, fill) in self.skills_map.items():
             idx = col_idx.get(name)
             if idx is None:
                 continue
-            col_cx   = self._grid_x + idx * col_w + col_w / 2
+            col_cx   = col_centers[idx]
             plot_val = max(scale_score, 80)   # clamp Pre A1 scores to chart floor
             y        = self._y(plot_val)
 
@@ -733,21 +742,34 @@ def _speaking_score_analysis_page(speaking_scoring: dict) -> list:
     ]))
     e.append(title_row)
 
+    # Chart width = left panel (150pt) + one LRW-equivalent column (115pt) = 265pt
+    # Card adds 10pt padding each side → card total = 285pt, centered on page
+    _SPK_CHART_W = 265
+    _SPK_PAD     = 10
+    _SPK_CARD_W  = _SPK_CHART_W + _SPK_PAD * 2
     chart = CEFRProfileChart(
         skills=[("Speaking", int(speaking_scoring.get("scale_score", 120)), HEADING)],
-        width=USABLE - 20,
+        width=_SPK_CHART_W,
         height=310,
         skills_order=["Speaking"],
     )
-    card = Table([[chart]], colWidths=[USABLE])
+    card = Table([[chart]], colWidths=[_SPK_CARD_W])
     card.setStyle(TableStyle([
         ("BOX",           (0, 0), (-1, -1), 0.5, RULE),
-        ("TOPPADDING",    (0, 0), (-1, -1), 10),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 10),
-        ("LEFTPADDING",   (0, 0), (-1, -1), 10),
-        ("RIGHTPADDING",  (0, 0), (-1, -1), 10),
+        ("TOPPADDING",    (0, 0), (-1, -1), _SPK_PAD),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), _SPK_PAD),
+        ("LEFTPADDING",   (0, 0), (-1, -1), _SPK_PAD),
+        ("RIGHTPADDING",  (0, 0), (-1, -1), _SPK_PAD),
     ]))
-    e.append(card)
+    centered = Table([[card]], colWidths=[USABLE])
+    centered.setStyle(TableStyle([
+        ("ALIGN",         (0, 0), (-1, -1), "CENTER"),
+        ("LEFTPADDING",   (0, 0), (-1, -1), 0),
+        ("RIGHTPADDING",  (0, 0), (-1, -1), 0),
+        ("TOPPADDING",    (0, 0), (-1, -1), 0),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+    ]))
+    e.append(centered)
     e.append(Spacer(1, 10))
     e.append(Paragraph(
         "The Common European Framework of Reference for Languages (CEFR) is a "
