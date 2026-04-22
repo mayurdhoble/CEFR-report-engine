@@ -254,15 +254,16 @@ class CEFRProfileChart(Flowable):
         (180, 230, "Proficient"),   # C1–C2
     ]
 
-    _SKILLS = ["Speaking", "Listening", "Reading", "Writing"]
+    _DEFAULT_SKILLS = ["Speaking", "Listening", "Reading", "Writing"]
 
-    def __init__(self, skills, width=490, height=310):
+    def __init__(self, skills, width=490, height=310, skills_order=None):
         """
-        skills: list of (skill_name, scale_score, fill_color)
-                Only named skills will have an arrow drawn; others left empty.
+        skills:       list of (skill_name, scale_score, fill_color)
+        skills_order: list of column names to display (controls which columns appear)
         """
         super().__init__()
         self.skills_map = {s[0]: s for s in skills}
+        self._SKILLS    = skills_order if skills_order else self._DEFAULT_SKILLS
         self.width  = width
         self.height = height
 
@@ -393,8 +394,9 @@ class CEFRProfileChart(Flowable):
             idx = col_idx.get(name)
             if idx is None:
                 continue
-            col_cx = self._grid_x + idx * col_w + col_w / 2
-            y      = self._y(scale_score)
+            col_cx   = self._grid_x + idx * col_w + col_w / 2
+            plot_val = max(scale_score, 80)   # clamp Pre A1 scores to chart floor
+            y        = self._y(plot_val)
 
             lx = col_cx - aw / 2
             rx = col_cx + aw / 2
@@ -550,6 +552,7 @@ def _score_analysis_page(reading_scoring: dict, listening_scoring: dict, writing
         ],
         width=USABLE - 20,
         height=310,
+        skills_order=["Listening", "Reading", "Writing"],
     )
     card = Table([[chart]], colWidths=[USABLE])
     card.setStyle(TableStyle([
@@ -710,8 +713,96 @@ def _test_log_page(candidate: dict) -> list:
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# Public entry point
+# Speaking-only pages
 # ══════════════════════════════════════════════════════════════════════════════
+def _speaking_score_analysis_page(speaking_scoring: dict) -> list:
+    e = []
+    e.append(Spacer(1, 10))
+    e.append(_section_heading("Score Analysis"))
+    e.append(Spacer(1, 8))
+
+    title_row = Table([[
+        Paragraph("<b>CEFR Assessment Profile</b>", STYLES["col_head"]),
+        Paragraph("Cambridge English Scale &middot; Speaking breakdown", STYLES["blurb"]),
+    ]], colWidths=[180, USABLE - 180])
+    title_row.setStyle(TableStyle([
+        ("VALIGN",       (0, 0), (-1, -1), "MIDDLE"),
+        ("LEFTPADDING",  (0, 0), (-1, -1), 0),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+        ("BOTTOMPADDING",(0, 0), (-1, -1), 4),
+    ]))
+    e.append(title_row)
+
+    chart = CEFRProfileChart(
+        skills=[("Speaking", int(speaking_scoring.get("scale_score", 120)), HEADING)],
+        width=USABLE - 20,
+        height=310,
+        skills_order=["Speaking"],
+    )
+    card = Table([[chart]], colWidths=[USABLE])
+    card.setStyle(TableStyle([
+        ("BOX",           (0, 0), (-1, -1), 0.5, RULE),
+        ("TOPPADDING",    (0, 0), (-1, -1), 10),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 10),
+        ("LEFTPADDING",   (0, 0), (-1, -1), 10),
+        ("RIGHTPADDING",  (0, 0), (-1, -1), 10),
+    ]))
+    e.append(card)
+    e.append(Spacer(1, 10))
+    e.append(Paragraph(
+        "The Common European Framework of Reference for Languages (CEFR) is a "
+        "standardised grading system aiming to validate language ability.",
+        STYLES["blurb"],
+    ))
+    e.append(_cefr_legend())
+    return e
+
+
+def _speaking_skill_analysis_page(speaking_scoring: dict) -> list:
+    e = []
+    e.append(Spacer(1, 10))
+    e.append(_section_heading("Section Skill Analysis"))
+    e.append(Spacer(1, 6))
+
+    LEFT_W, RIGHT_W = 315, 175
+    hdr = Table(
+        [[Paragraph("Capabilities and Skills", STYLES["col_head"]),
+          Paragraph("Understanding the skills", STYLES["col_head_r"])]],
+        colWidths=[LEFT_W, RIGHT_W],
+    )
+    hdr.setStyle(TableStyle([
+        ("LINEBELOW",     (0, 0), (-1, -1), 0.5, RULE),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+    ]))
+    e.append(hdr)
+    e.append(Spacer(1, 8))
+    e.append(_skill_section_row(1, "Speaking", speaking_scoring))
+    e.append(Spacer(1, 16))
+    return e
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Public entry points
+# ══════════════════════════════════════════════════════════════════════════════
+def generate_speaking_report(candidate: dict, speaking_scoring: dict) -> bytes:
+    buf = io.BytesIO()
+    doc = SimpleDocTemplate(
+        buf, pagesize=A4,
+        leftMargin=40, rightMargin=40,
+        topMargin=30,  bottomMargin=30,
+    )
+    story = []
+    story.extend(_cover_page(candidate))
+    story.append(PageBreak())
+    story.extend(_speaking_score_analysis_page(speaking_scoring))
+    story.append(PageBreak())
+    story.extend(_speaking_skill_analysis_page(speaking_scoring))
+    story.append(PageBreak())
+    story.extend(_test_log_page(candidate))
+    doc.build(story, onFirstPage=_on_page, onLaterPages=_on_page)
+    return buf.getvalue()
+
+
 def generate_reading_report(candidate: dict, reading_scoring: dict, listening_scoring: dict, writing_scoring: dict) -> bytes:
     buf = io.BytesIO()
     doc = SimpleDocTemplate(

@@ -112,16 +112,142 @@ LISTENING_SKILL_DEFINITION = (
 )
 
 
+# ── Speaking ───────────────────────────────────────────────────────────────────
+
+SPEAKING_BANDS = {
+    "Pre A1": {"band_min": 0,  "band_max": 19,  "band_start": 10,  "band_range": 89},
+    "A1":     {"band_min": 20, "band_max": 30,  "band_start": 100, "band_range": 19},
+    "A2":     {"band_min": 31, "band_max": 45,  "band_start": 120, "band_range": 19},
+    "B1":     {"band_min": 46, "band_max": 58,  "band_start": 140, "band_range": 19},
+    "B2":     {"band_min": 59, "band_max": 69,  "band_start": 160, "band_range": 19},
+    "C1":     {"band_min": 70, "band_max": 79,  "band_start": 180, "band_range": 19},
+    "C2":     {"band_min": 80, "band_max": 100, "band_start": 200, "band_range": 30},
+}
+
+SPEAKING_CAPABILITY = {
+    "Pre A1": (
+        "Can use isolated words and basic expressions (often lack any awareness of "
+        "grammatical conventions) in order to give simple information about themselves."
+    ),
+    "A1": (
+        "Has a very basic range of simple expressions about personal details and needs "
+        "of a concrete type. Can use some basic structures in one-clause sentences with "
+        "some omission or reduction of elements."
+    ),
+    "A2": (
+        "Has a repertoire of basic language which enables them to deal with everyday "
+        "situations with predictable content, though they will generally have to "
+        "compromise the message and search for words/signs. Can produce brief, everyday "
+        "expressions to satisfy simple needs of a concrete type (e.g. personal details, "
+        "daily routines wants and needs, and requests for information). Can use basic "
+        "sentence patterns and communicate with memorized phrases, groups of a few words "
+        "and formulae about themselves and other people, what they do, places, "
+        "possessions, etc."
+    ),
+    "B1": (
+        "Has a sufficient range of language to describe unpredictable situations, explain "
+        "the main points in an idea or problem with reasonable precision and express "
+        "thoughts on abstract or cultural topics such as music and film. Has enough "
+        "language to get by, with sufficient vocabulary to express themselves with some "
+        "hesitation and circumlocutions on topics such as family, hobbies and interests, "
+        "work, travel, and current events, but lexical limitations cause repetition and "
+        "even difficulty with formulation at times."
+    ),
+    "B2": (
+        "Can express themselves clearly without much sign of having to restrict what "
+        "they want to say. Has a sufficient range of language to be able to give clear "
+        "descriptions, express viewpoints and develop arguments without much conspicuous "
+        "searching for words/signs, using some complex sentence forms to do so."
+    ),
+    "C1": (
+        "Can use a broad range of complex grammatical structures appropriately and with "
+        "considerable flexibility. Can select an appropriate formulation from a broad "
+        "range of language to express themselves clearly, without having to restrict "
+        "what they want to say."
+    ),
+    "C2": (
+        "Can exploit a comprehensive and reliable mastery of a very wide range of "
+        "language to formulate thoughts precisely, give emphasis, differentiate and "
+        "eliminate ambiguity. No signs of having to restrict what they want to say."
+    ),
+}
+
+SPEAKING_SKILL_DEFINITION = (
+    "Speaking reflects the ability to understand a visual or written prompt and respond "
+    "to it in clear, intelligible spoken English. The score is based on the ability to "
+    "convey meaning with appropriate fluency and rhythm, accurate grammar and vocabulary, "
+    "and pronunciation that does not impede communication."
+)
+
+
+def run_speaking_score(
+    oral_fluency: float,
+    vocabulary: float,
+    grammar: float,
+    phonological: float,
+    comprehension: float,
+) -> dict:
+    """
+    Computes Speaking CEFR level and Cambridge scale score from sub-skill percentages.
+
+    Weightages: Vocabulary 30%, Grammar 20%, Oral Fluency 20%,
+                Comprehension 15%, Phonological Control 15%.
+    Band lookup: position within band_min–band_max range.
+    """
+    weighted = round(
+        vocabulary   * 0.30 +
+        grammar      * 0.20 +
+        oral_fluency * 0.20 +
+        comprehension * 0.15 +
+        phonological  * 0.15,
+        1,
+    )
+
+    if weighted >= 80:
+        display = "C2"
+    elif weighted >= 70:
+        display = "C1"
+    elif weighted >= 59:
+        display = "B2"
+    elif weighted >= 46:
+        display = "B1"
+    elif weighted >= 31:
+        display = "A2"
+    elif weighted >= 20:
+        display = "A1"
+    else:
+        display = "Pre A1"
+
+    band         = SPEAKING_BANDS[display]
+    band_min     = band["band_min"]
+    band_max     = band["band_max"]
+    denom        = band_max - band_min
+    perf_pct     = round((weighted - band_min) / denom * 100, 1) if denom > 0 else 0.0
+    scale_score  = band["band_start"] + round(perf_pct * band["band_range"] / 100)
+    normalized_pct = round((scale_score - 10) / 220 * 100, 1)
+
+    return {
+        "cefr_display":         display,
+        "scale_score":          scale_score,
+        "performance_pct":      perf_pct,
+        "normalized_pct":       normalized_pct,
+        "weighted_score":       weighted,
+        "proficiency_label":    PROFICIENCY_LABELS.get(display, ""),
+        "capability_statement": SPEAKING_CAPABILITY.get(display, ""),
+        "skill_definition":     SPEAKING_SKILL_DEFINITION,
+    }
+
+
 # ── Writing ────────────────────────────────────────────────────────────────────
 
 WRITING_BANDS = {
-    "Pre A1": {"band_start": 80,  "band_range": 19},
-    "A1":     {"band_start": 100, "band_range": 19},
-    "A2":     {"band_start": 120, "band_range": 19},
-    "B1":     {"band_start": 140, "band_range": 19},
-    "B2":     {"band_start": 160, "band_range": 19},
-    "C1":     {"band_start": 180, "band_range": 19},
-    "C2":     {"band_start": 200, "band_range": 30},
+    "Pre A1": {"band_min": 0,  "band_max": 19,  "band_start": 10,  "band_range": 89},
+    "A1":     {"band_min": 20, "band_max": 34,  "band_start": 100, "band_range": 19},
+    "A2":     {"band_min": 35, "band_max": 46,  "band_start": 120, "band_range": 19},
+    "B1":     {"band_min": 47, "band_max": 55,  "band_start": 140, "band_range": 19},
+    "B2":     {"band_min": 56, "band_max": 75,  "band_start": 160, "band_range": 19},
+    "C1":     {"band_min": 76, "band_max": 90,  "band_start": 180, "band_range": 19},
+    "C2":     {"band_min": 91, "band_max": 100, "band_start": 200, "band_range": 30},
 }
 
 WRITING_CAPABILITY = {
@@ -206,14 +332,19 @@ def run_writing_score(
     else:
         display = "Pre A1"
 
-    band            = WRITING_BANDS[display]
-    scale_score     = band["band_start"] + round(weighted * band["band_range"] / 100)
-    normalized_pct  = round((scale_score - 80) / 150 * 100, 1)
+    band        = WRITING_BANDS[display]
+    band_min    = band["band_min"]
+    band_max    = band["band_max"]
+    denom       = band_max - band_min
+    perf_pct    = round((weighted - band_min) / denom * 100, 1) if denom > 0 else 0.0
+    scale_score = band["band_start"] + round(perf_pct * band["band_range"] / 100)
+    normalized_pct = round((scale_score - 10) / 220 * 100, 1)
 
     return {
         "cefr_display":         display,
         "scale_score":          scale_score,
-        "performance_pct":      weighted,
+        "performance_pct":      perf_pct,
+        "weighted_score":       weighted,
         "normalized_pct":       normalized_pct,
         "proficiency_label":    PROFICIENCY_LABELS.get(display, ""),
         "capability_statement": WRITING_CAPABILITY.get(display, ""),

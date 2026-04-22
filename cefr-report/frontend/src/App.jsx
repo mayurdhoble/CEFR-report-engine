@@ -90,24 +90,29 @@ function Badge({ level }) {
 
 // ── Main app ───────────────────────────────────────────────────────────────────
 export default function App() {
-  const [file, setFile]         = useState(null);
-  const [dragging, setDragging] = useState(false);
-  const [status, setStatus]     = useState("idle");
-  const [rows, setRows]         = useState([]);
+  const [lrwFile, setLrwFile]         = useState(null);
+  const [spkFile, setSpkFile]         = useState(null);
+  const [draggingLrw, setDraggingLrw] = useState(false);
+  const [draggingSpk, setDraggingSpk] = useState(false);
+  const [status, setStatus]           = useState("idle");
+  const [rows, setRows]               = useState([]);
   const [downloadUrl, setDownloadUrl] = useState(null);
-  const [errorMsg, setErrorMsg] = useState("");
-  const [totalProcessed, setTotalProcessed] = useState(0);
-  const inputRef = useRef();
+  const [errorMsg, setErrorMsg]       = useState("");
+  const lrwRef = useRef();
+  const spkRef = useRef();
+
+  const bothReady = lrwFile && spkFile;
 
   async function handleUpload() {
-    if (!file) return;
+    if (!bothReady) return;
     setStatus("uploading");
     setRows([]);
     setDownloadUrl(null);
     setErrorMsg("");
 
     const formData = new FormData();
-    formData.append("file", file);
+    formData.append("lrw_file",      lrwFile);
+    formData.append("speaking_file", spkFile);
 
     try {
       const res = await axios.post(`${API}/upload`, formData, {
@@ -127,15 +132,14 @@ export default function App() {
         const ws = wb.Sheets[wb.SheetNames[0]];
         const data = window.XLSX.utils.sheet_to_json(ws);
         const parsed = data.map((r) => ({
-          name:        r["Employee_Full_Name"] || "—",
-          id:          r["Employee_ID"] || "—",
-          report_link: r["Report_Link"] || "",
+          name:                r["Employee_Full_Name"] || "—",
+          id:                  r["Employee_ID"] || "—",
+          lrw_report_link:     r["LRW_Report_Link"] || "",
+          speaking_report_link: r["Speaking_Report_Link"] || "",
         }));
         setRows(parsed);
-        setTotalProcessed(t => t + parsed.length);
       } else {
-        setRows([{ name: "Upload complete", id: "—", report_link: "" }]);
-        setTotalProcessed(t => t + 1);
+        setRows([{ name: "Upload complete", id: "—", lrw_report_link: "", speaking_report_link: "" }]);
       }
     } catch (err) {
       setStatus("error");
@@ -143,15 +147,9 @@ export default function App() {
     }
   }
 
-  function onDrop(e) {
-    e.preventDefault();
-    setDragging(false);
-    const f = e.dataTransfer.files[0];
-    if (f) setFile(f);
-  }
-
   function reset() {
-    setFile(null);
+    setLrwFile(null);
+    setSpkFile(null);
     setStatus("idle");
     setRows([]);
     setDownloadUrl(null);
@@ -211,13 +209,13 @@ export default function App() {
             )}
             <button
               onClick={handleUpload}
-              disabled={!file || status === "uploading"}
+              disabled={!bothReady || status === "uploading"}
               style={{
-                background: file && status !== "uploading" ? C.text : C.border,
-                color: file && status !== "uploading" ? "#fff" : C.sub,
+                background: bothReady && status !== "uploading" ? C.text : C.border,
+                color: bothReady && status !== "uploading" ? "#fff" : C.sub,
                 border: "none", borderRadius: 8, padding: "8px 18px",
                 fontWeight: 600, fontSize: 13,
-                cursor: file && status !== "uploading" ? "pointer" : "not-allowed",
+                cursor: bothReady && status !== "uploading" ? "pointer" : "not-allowed",
               }}>
               {status === "uploading" ? "Processing…" : "Generate Reports"}
             </button>
@@ -243,44 +241,41 @@ export default function App() {
             <StatCard label="Candidates Processed"
               value={isDone ? rows.length : "—"} color={C.purple} />
             <StatCard label="Skills Scored"
-              value={isDone ? "Reading · Listening" : "—"} color={C.blue} />
+              value={isDone ? "R · L · W · S" : "—"} color={C.blue} />
             <StatCard label="Status"
               value={isDone ? "Complete" : status === "uploading" ? "Processing" : "Idle"}
               color={isDone ? C.green : C.sub} />
           </div>
 
-          {/* Upload zone */}
+          {/* Upload zones */}
           {!isDone && (
-            <div
-              onClick={() => inputRef.current.click()}
-              onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
-              onDragLeave={() => setDragging(false)}
-              onDrop={onDrop}
-              style={{
-                border: `2px dashed ${dragging ? C.orange : C.border}`,
-                borderRadius: 12, padding: "44px 24px", textAlign: "center",
-                cursor: "pointer",
-                background: dragging ? C.orangeLight : C.white,
-                marginBottom: 20,
-              }}>
-              <input ref={inputRef} type="file" accept=".csv,.xlsx,.xls"
-                style={{ display: "none" }}
-                onChange={(e) => setFile(e.target.files[0])} />
-              <div style={{ fontSize: 32, marginBottom: 10 }}>📂</div>
-              {file ? (
-                <p style={{ fontWeight: 600, color: C.orange, fontSize: 14 }}>
-                  {file.name}
-                </p>
-              ) : (
-                <>
-                  <p style={{ fontWeight: 600, color: C.text, fontSize: 14, margin: 0 }}>
-                    Drag & drop your CSV / Excel export here
-                  </p>
-                  <p style={{ color: C.sub, fontSize: 12, marginTop: 6 }}>
-                    or click to browse &nbsp;·&nbsp; .csv, .xlsx supported
-                  </p>
-                </>
-              )}
+            <div style={{ display: "flex", gap: 16, marginBottom: 20 }}>
+              {/* LRW file */}
+              <DropZone
+                label="LRW File"
+                hint="Reading · Listening · Writing export"
+                file={lrwFile}
+                dragging={draggingLrw}
+                inputRef={lrwRef}
+                onDragOver={() => setDraggingLrw(true)}
+                onDragLeave={() => setDraggingLrw(false)}
+                onDrop={(e) => { e.preventDefault(); setDraggingLrw(false); const f = e.dataTransfer.files[0]; if (f) setLrwFile(f); }}
+                onChange={(e) => setLrwFile(e.target.files[0])}
+                C={C}
+              />
+              {/* Speaking file */}
+              <DropZone
+                label="Speaking File"
+                hint="Speaking sub-skills export"
+                file={spkFile}
+                dragging={draggingSpk}
+                inputRef={spkRef}
+                onDragOver={() => setDraggingSpk(true)}
+                onDragLeave={() => setDraggingSpk(false)}
+                onDrop={(e) => { e.preventDefault(); setDraggingSpk(false); const f = e.dataTransfer.files[0]; if (f) setSpkFile(f); }}
+                onChange={(e) => setSpkFile(e.target.files[0])}
+                C={C}
+              />
             </div>
           )}
 
@@ -327,7 +322,7 @@ export default function App() {
               <table style={{ width: "100%", borderCollapse: "collapse" }}>
                 <thead>
                   <tr style={{ background: "#F9FAFB" }}>
-                    {["#", "Candidate Name", "Employee ID", "Report"].map((h) => (
+                    {["#", "Candidate Name", "Employee ID", "LRW Report", "Speaking Report"].map((h) => (
                       <th key={h} style={TH}>{h}</th>
                     ))}
                   </tr>
@@ -342,14 +337,22 @@ export default function App() {
                       <td style={{ ...TD, fontWeight: 500 }}>{r.name}</td>
                       <td style={{ ...TD, color: C.sub }}>{r.id}</td>
                       <td style={TD}>
-                        {r.report_link ? (
-                          <a href={r.report_link} target="_blank" rel="noreferrer"
-                            style={{
-                              color: C.orange, fontSize: 12, fontWeight: 600,
+                        {r.lrw_report_link ? (
+                          <a href={r.lrw_report_link} target="_blank" rel="noreferrer"
+                            style={{ color: C.orange, fontSize: 12, fontWeight: 600,
                               textDecoration: "none", border: `1px solid ${C.orange}`,
-                              borderRadius: 6, padding: "3px 10px",
-                            }}>
-                            View PDF →
+                              borderRadius: 6, padding: "3px 10px" }}>
+                            LRW PDF →
+                          </a>
+                        ) : "—"}
+                      </td>
+                      <td style={TD}>
+                        {r.speaking_report_link ? (
+                          <a href={r.speaking_report_link} target="_blank" rel="noreferrer"
+                            style={{ color: C.purple, fontSize: 12, fontWeight: 600,
+                              textDecoration: "none", border: `1px solid ${C.purple}`,
+                              borderRadius: 6, padding: "3px 10px" }}>
+                            Speaking PDF →
                           </a>
                         ) : "—"}
                       </td>
@@ -368,9 +371,34 @@ export default function App() {
           display: "flex", justifyContent: "space-between",
         }}>
           <span>iMocha · CEFR Report Engine</span>
-          <span>Reading &amp; Listening Module</span>
+          <span>Reading · Listening · Writing · Speaking</span>
         </footer>
       </div>
+    </div>
+  );
+}
+
+function DropZone({ label, hint, file, dragging, inputRef, onDragOver, onDragLeave, onDrop, onChange, C }) {
+  return (
+    <div
+      onClick={() => inputRef.current.click()}
+      onDragOver={(e) => { e.preventDefault(); onDragOver(); }}
+      onDragLeave={onDragLeave}
+      onDrop={onDrop}
+      style={{
+        flex: 1, border: `2px dashed ${dragging ? C.orange : C.border}`,
+        borderRadius: 12, padding: "32px 20px", textAlign: "center",
+        cursor: "pointer", background: dragging ? C.orangeLight : C.white,
+      }}>
+      <input ref={inputRef} type="file" accept=".csv,.xlsx,.xls"
+        style={{ display: "none" }} onChange={onChange} />
+      <div style={{ fontSize: 28, marginBottom: 8 }}>📂</div>
+      <div style={{ fontWeight: 700, fontSize: 13, color: C.text, marginBottom: 4 }}>{label}</div>
+      {file ? (
+        <p style={{ fontWeight: 600, color: C.orange, fontSize: 13, margin: 0 }}>{file.name}</p>
+      ) : (
+        <p style={{ color: C.sub, fontSize: 12, margin: 0 }}>{hint}<br />Drag & drop or click to browse</p>
+      )}
     </div>
   );
 }
