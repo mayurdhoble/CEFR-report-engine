@@ -120,27 +120,10 @@ export default function App() {
         headers: { "Content-Type": "multipart/form-data" },
       });
 
-      const blob = new Blob([res.data], {
-        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      });
+      const blob = new Blob([res.data], { type: "application/zip" });
       setDownloadUrl(URL.createObjectURL(blob));
       setStatus("done");
-
-      if (window.XLSX) {
-        const ab = await blob.arrayBuffer();
-        const wb = window.XLSX.read(ab, { type: "array" });
-        const ws = wb.Sheets[wb.SheetNames[0]];
-        const data = window.XLSX.utils.sheet_to_json(ws);
-        const parsed = data.map((r) => ({
-          name:                r["Employee_Full_Name"] || "—",
-          id:                  r["Employee_ID"] || "—",
-          lrw_report_link:     r["LRW_Report_Link"] || "",
-          speaking_report_link: r["Speaking_Report_Link"] || "",
-        }));
-        setRows(parsed);
-      } else {
-        setRows([{ name: "Upload complete", id: "—", lrw_report_link: "", speaking_report_link: "" }]);
-      }
+      setRows([{ name: "Reports generated", id: "—", lrw_report_link: "", speaking_report_link: "" }]);
     } catch (err) {
       setStatus("error");
       setErrorMsg(err.response?.data?.detail || err.message || "Upload failed.");
@@ -197,14 +180,14 @@ export default function App() {
             {downloadUrl && (
               <a
                 href={downloadUrl}
-                download="cefr_reports_with_links.xlsx"
+                download="cefr_reports.zip"
                 style={{
                   background: C.orange, color: "#fff", borderRadius: 8,
                   padding: "8px 18px", fontWeight: 600, fontSize: 13,
                   textDecoration: "none", display: "inline-flex",
                   alignItems: "center", gap: 6,
                 }}>
-                ↓ Download Excel
+                ↓ Download Reports (ZIP)
               </a>
             )}
             <button
